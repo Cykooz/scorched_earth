@@ -1,0 +1,26 @@
+[package]
+name = "scorched_earth"
+version = "0.1.0"
+authors = ["Kirill Kuzminykh <cykooz@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+noise = "0.6.0"
+
+
+[dependencies.rand]
+version = "0.7.2"
+features = ["small_rng"]
+
+
+[dependencies.sdl2]
+version = "0.32.2"
+features = ["gfx", "image"]
+
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
