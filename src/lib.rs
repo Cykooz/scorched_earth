@@ -1,19 +1,13 @@
-use sdl2::render::WindowCanvas;
-
-pub use app::App;
+pub use assets::Assets;
 pub use game_state::GameState;
 pub use landscape::Landscape;
-pub use resources::Resources;
+pub use missile::Missile;
 pub use tank::Tank;
-pub use window::Window;
+pub use types::*;
 
-mod app;
+mod assets;
 mod game_state;
 mod landscape;
-mod resources;
+mod missile;
 mod tank;
-mod window;
-
-pub trait Draw {
-    fn draw(&self, canvas: &mut WindowCanvas) -> Result<(), String>;
-}
+mod types;

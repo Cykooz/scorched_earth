@@ -1,16 +1,13 @@
-use crate::Draw;
 use noise::{self, Fbm, MultiFractal, NoiseFn, Seedable};
-use sdl2::pixels::Color;
-use sdl2::rect::Point;
-use sdl2::render::Canvas;
-use sdl2::video::Window;
+
+use crate::Point2;
 
 pub struct Landscape {
     width: u32,
     height: u32,
-    pub buffer: Vec<u8>,
+    buffer: Vec<u8>,
     noise: Option<Fbm>,
-    pub amplitude: f64,
+    amplitude: f64,
     pub dx: i32,
 }
 
@@ -107,8 +104,9 @@ impl Landscape {
         })
     }
 
-    pub fn get_pixels_line_mut(&mut self, point: Point, length: u32) -> Option<&mut [u8]> {
-        let (x, y): (i32, i32) = point.into();
+    /// Get mutable slice with row of pixels given length
+    pub fn get_pixels_line_mut(&mut self, point: Point2, length: u32) -> Option<&mut [u8]> {
+        let (x, y) = (point.x as i32, point.y as i32);
         if x < 0 || y < 0 || x >= self.width as _ || y >= self.height as _ || length == 0 {
             return None;
         }
@@ -116,14 +114,36 @@ impl Landscape {
         let length = length.min(self.width - x as u32) as usize;
         Some(&mut self.buffer[index..index + length])
     }
-}
 
-impl Draw for Landscape {
-    fn draw(&self, canvas: &mut Canvas<Window>) -> Result<(), String> {
-        canvas.set_draw_color(Color::RGB(0, 189, 207));
-        for point in self.iter_filled_points() {
-            canvas.draw_point(point)?;
+    pub fn is_not_empty(&self, x: i32, y: i32) -> bool {
+        if x < 0 || y < 0 || x >= self.width as i32 || y >= self.height as i32 {
+            return false;
         }
-        Ok(())
+        let index = (y as u32 * self.width + x as u32) as usize;
+        self.buffer[index] > 0
+    }
+
+    pub fn to_rgba(&self) -> Vec<u8> {
+        let image_size = self.buffer.len() * 4;
+        let mut rgba: Vec<u8> = Vec::with_capacity(image_size);
+        let buf = unsafe {
+            rgba.set_len(image_size);
+            rgba.align_to_mut::<u32>().1
+        };
+        for (&v, d) in self.buffer.iter().zip(buf) {
+            *d = if v == 0 { 0 } else { 0xff_cf_bd_00 }
+        }
+
+        rgba
     }
 }
+
+//impl Draw for Landscape {
+//    fn draw(&self, canvas: &mut Canvas<Window>) -> Result<(), String> {
+//        canvas.set_draw_color(Color::RGB(0, 189, 207));
+//        for point in self.iter_filled_points() {
+//            canvas.draw_point(point)?;
+//        }
+//        Ok(())
+//    }
+//}

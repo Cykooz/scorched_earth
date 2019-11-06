@@ -8,6 +8,9 @@ edition = "2018"
 
 [dependencies]
 noise = "0.6.0"
+ggez = "0.5.1"
+nalgebra = "0.18.1"
+bytecount = "0.6.0"
 
 
 [dependencies.rand]
@@ -15,12 +18,12 @@ version = "0.7.2"
 features = ["small_rng"]
 
 
-[dependencies.sdl2]
-version = "0.32.2"
-features = ["gfx", "image"]
+[dependencies.cgmath]
+version = "0.17.0"
+features = ["mint"]
 
 
 [profile.release]
-lto = true
+#lto = true
 opt-level = 3
-codegen-units = 1
+#codegen-units = 1

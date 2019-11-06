@@ -1,50 +1,78 @@
-use sdl2::pixels::Color;
-use sdl2::render::Canvas;
-use sdl2::video::Window;
+use std::f32::consts::PI;
 
-use crate::Draw;
-use sdl2::rect::{Point, Rect};
+use ggez::graphics::{Color, Rect};
 
-const TANK_SIZE: u32 = 42;
+use crate::{Missile, Point2, Vector2};
+
+const TANK_SIZE: f32 = 41.;
+const GUN_SIZE: f32 = 21.;
+const POWER_SCALE: f32 = 300. / 100.;
 
 pub struct Tank {
-    rect: Rect,
-    color: Color,
+    pub rect: Rect,
+    pub color: Color,
+    pub angle: f32,
+    pub power: f32,
 }
 
 impl Tank {
-    pub fn new(top_left: Point, color: Color) -> Tank {
-        let rect = Rect::new(top_left.x(), top_left.y(), TANK_SIZE, TANK_SIZE);
-        Tank { rect, color }
+    pub fn new(top_left: Point2, color: Color) -> Tank {
+        let rect = Rect::new(top_left.x, top_left.y, TANK_SIZE, TANK_SIZE);
+        Tank {
+            rect,
+            color,
+            angle: 0.0,
+            power: 40.0,
+        }
     }
 
     #[inline]
-    pub fn bottom_left(&self) -> Point {
-        Point::new(self.rect.left(), self.rect.bottom() - 1)
+    pub fn bottom_left(&self) -> Point2 {
+        [self.rect.x, self.rect.bottom() - 1.].into()
     }
 
     #[inline]
-    pub fn width(&self) -> u32 {
-        self.rect.width()
+    pub fn top_left(&self) -> Point2 {
+        [self.rect.x, self.rect.y].into()
+    }
+
+    #[inline]
+    pub fn width(&self) -> f32 {
+        self.rect.w
     }
 
     /// Move this tank and clamp the positions to prevent over/underflow.
     #[inline]
-    pub fn offset<P>(&mut self, point: P)
-    where
-        P: Into<(i32, i32)>,
-    {
-        let (x, y): (i32, i32) = point.into();
-        self.rect.offset(x, y);
+    pub fn offset(&mut self, x: f32, y: f32) {
+        self.rect.translate([x, y]);
+    }
+
+    pub fn gun_barrel_pos(&self) -> Point2 {
+        let center = Point2::new(
+            self.rect.x + self.rect.w / 2.,
+            self.rect.y + self.rect.h / 2.,
+        );
+        let rad = self.angle * PI / 180.0;
+        let gun_vec = Vector2::new(GUN_SIZE * rad.sin(), -GUN_SIZE * rad.cos());
+        center + gun_vec
+    }
+
+    pub fn shoot(&self, acceleration: Vector2) -> Missile {
+        Missile::new(
+            self.gun_barrel_pos(),
+            self.angle,
+            self.power * POWER_SCALE,
+            acceleration,
+        )
     }
 }
 
-impl Draw for Tank {
-    fn draw(&self, canvas: &mut Canvas<Window>) -> Result<(), String> {
-        canvas.set_draw_color(self.color);
-        canvas.fill_rect(self.rect)
-    }
-}
+//impl Draw for Tank {
+//    fn draw(&self, canvas: &mut Canvas<Window>) -> Result<(), String> {
+//        canvas.set_draw_color(self.color);
+//        canvas.fill_rect(self.rect)
+//    }
+//}
 
 #[cfg(test)]
 mod tests {
@@ -52,8 +80,7 @@ mod tests {
 
     #[test]
     fn test_bottom_left() {
-        let tank = Tank::new((0, 0).into(), Color::RGB(0, 0, 0));
-        let height = TANK_SIZE as i32;
-        assert_eq!(tank.bottom_left(), Point::new(0, height - 1));
+        let tank = Tank::new([0., 0.].into(), (0, 0, 0).into());
+        assert_eq!(tank.bottom_left(), [0., TANK_SIZE - 1.].into());
     }
 }
