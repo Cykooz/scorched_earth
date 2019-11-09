@@ -1,5 +1,5 @@
 use ggez;
-use ggez::conf::{NumSamples, WindowMode, WindowSetup};
+use ggez::conf::{WindowMode, WindowSetup};
 use ggez::event::quit;
 use ggez::graphics;
 use ggez::input::keyboard::{KeyCode, KeyMods};
@@ -10,18 +10,26 @@ struct MainState {
     game_state: GameState,
     assets: Assets,
     landscape_image: Option<graphics::Image>,
+    borders_mesh: graphics::Mesh,
     missile_mesh: graphics::Mesh,
 }
 
 impl MainState {
     fn new(ctx: &mut ggez::Context) -> ggez::GameResult<MainState> {
-        let (width, height) = graphics::size(ctx);
-        let game_state = GameState::new(width, height).map_err(GameError::ResourceLoadError)?;
+        let (width, height) = screen_size(ctx);
+        let game_state =
+            GameState::new(width - 2.0, height - 2.0).map_err(GameError::ResourceLoadError)?;
 
         let mut state = MainState {
             game_state,
             landscape_image: None,
             assets: Assets::new(ctx)?,
+            borders_mesh: graphics::Mesh::new_rectangle(
+                ctx,
+                graphics::DrawMode::stroke(1.0),
+                graphics::Rect::new(0.0, 0.0, width - 1.0, height - 1.0),
+                graphics::Color::from_rgb(255, 255, 255),
+            )?,
             missile_mesh: graphics::Mesh::new_circle(
                 ctx,
                 graphics::DrawMode::fill(),
@@ -37,11 +45,10 @@ impl MainState {
     }
 
     fn build_landscape_image(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
-        let (width, height) = graphics::size(ctx);
         self.landscape_image = Some(graphics::Image::from_rgba8(
             ctx,
-            width as u16,
-            height as u16,
+            self.game_state.width as u16,
+            self.game_state.height as u16,
             &self.game_state.landscape.to_rgba(),
         )?);
         Ok(())
@@ -54,8 +61,7 @@ impl event::EventHandler for MainState {
             self.build_landscape_image(ctx)?;
         }
 
-        let (width, height) = graphics::size(ctx);
-        self.game_state.update_missile(width, height);
+        self.game_state.update_missile();
 
         Ok(())
     }
@@ -63,26 +69,43 @@ impl event::EventHandler for MainState {
     fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
         graphics::clear(ctx, [0.1, 0.2, 0.3, 1.0].into());
 
-        if let Some(image) = &self.landscape_image {
-            let dst = Point2::new(0.0, 0.0);
-            graphics::draw(ctx, image, (dst,))?;
+        {
+            // Render playable space
+            let params = graphics::DrawParam::new().dest([1.0, 1.0]);
+            graphics::push_transform(ctx, Some(params.to_matrix()));
+            graphics::apply_transformations(ctx)?;
+
+            // Landscape
+            if let Some(image) = &self.landscape_image {
+                //let dst = Point2::new(0.0, 0.0);
+                graphics::draw(ctx, image, ([0.0, 0.0],))?;
+            }
+
+            // Tanks
+            for tank in &self.game_state.tanks {
+                let pos = tank.top_left();
+                let gun_params = graphics::DrawParam::new()
+                    .dest(pos + Vector2::new(20.5, 20.5))
+                    .offset(Point2::new(0.5, 0.5))
+                    .rotation(std::f32::consts::PI * tank.angle / 180.0);
+                graphics::draw(ctx, &self.assets.gun_image, gun_params)?;
+                let tank_params = graphics::DrawParam::new().dest(pos);
+                graphics::draw(ctx, &self.assets.tank_image, tank_params)?;
+            }
+
+            // Missile
+            if let Some(missile) = self.game_state.missile.as_ref() {
+                graphics::draw(ctx, &self.missile_mesh, (missile.cur_pos(),))?;
+            }
+
+            graphics::pop_transform(ctx);
+            graphics::apply_transformations(ctx)?;
         }
 
-        for tank in &self.game_state.tanks {
-            let pos = tank.top_left();
-            let gun_params = graphics::DrawParam::new()
-                .dest(pos + Vector2::new(20.5, 20.5))
-                .offset(Point2::new(0.5, 0.5))
-                .rotation(std::f32::consts::PI * tank.angle / 180.0);
-            graphics::draw(ctx, &self.assets.gun_image, gun_params)?;
-            let tank_params = graphics::DrawParam::new().dest(pos);
-            graphics::draw(ctx, &self.assets.tank_image, tank_params)?;
-        }
+        // Borders
+        graphics::draw(ctx, &self.borders_mesh, (Point2::new(1.0, 0.0),))?;
 
-        if let Some(missile) = self.game_state.missile.as_ref() {
-            graphics::draw(ctx, &self.missile_mesh, (missile.cur_pos,))?;
-        }
-
+        // Status line
         let angle = self.game_state.gun_angle();
         let text = graphics::Text::new((format!("Angle: {}", angle), self.assets.font, 20.0));
         let dest_point = Point2::new(10.0, 10.0);
@@ -98,7 +121,7 @@ impl event::EventHandler for MainState {
             self.assets.font,
             20.0,
         ));
-        let dest_point = Point2::new(210.0, 10.0);
+        let dest_point = Point2::new(220.0, 10.0);
         graphics::draw(ctx, &text, (dest_point,))?;
 
         graphics::present(ctx)?;
@@ -138,6 +161,12 @@ impl event::EventHandler for MainState {
     }
 }
 
+#[inline]
+fn screen_size(ctx: &mut ggez::Context) -> (f32, f32) {
+    let screen_rect = graphics::screen_coordinates(ctx);
+    (screen_rect.w, screen_rect.h)
+}
+
 pub fn main() -> ggez::GameResult {
     let resource_dir = if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
         let mut path = std::path::PathBuf::from(manifest_dir);
@@ -150,8 +179,7 @@ pub fn main() -> ggez::GameResult {
     let mut win_setup: WindowSetup = Default::default();
     win_setup = win_setup
         .title("Scorched Earth - Rust edition")
-        .icon("/sprites/tank.png")
-        .samples(NumSamples::Sixteen);
+        .icon("/sprites/app_icon.png");
     let mut win_mode: WindowMode = Default::default();
     win_mode = win_mode.dimensions(1024., 768.);
 

@@ -2,11 +2,14 @@ use ggez::graphics::Color;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
-use crate::missile::G;
+use crate::G;
 use crate::{Landscape, Missile, Tank, Vector2};
+use cgmath::InnerSpace;
 
 pub struct GameState {
     pub rng: ThreadRng,
+    pub width: f32,
+    pub height: f32,
     pub landscape: Landscape,
     pub wind_power: f32,
     pub tanks: Vec<Tank>,
@@ -31,6 +34,8 @@ impl GameState {
 
         Ok(GameState {
             rng,
+            width,
+            height,
             landscape,
             wind_power,
             tanks,
@@ -47,61 +52,39 @@ impl GameState {
     #[inline]
     pub fn regenerate_landscape(&mut self) {
         self.landscape.generate();
+        for tank in self.tanks.iter_mut() {
+            tank.throw_down();
+        }
     }
 
     pub fn update_landscape(&mut self) -> bool {
-        let row_offset = Vector2 { x: 0., y: 1. };
-        let height = self.landscape.size().1 as f32;
         let mut res = false;
 
         for tank in self.tanks.iter_mut() {
-            'speed: for _ in 0..2 {
-                let tank_bottom = tank.bottom_left();
-                if tank_bottom.y >= height {
-                    continue;
-                }
-                let under_tank = tank_bottom + row_offset;
-                let tank_width = tank.width() as u32;
-                let pixels_under_tank = self.landscape.get_pixels_line_mut(under_tank, tank_width);
-                if let Some(pixels) = pixels_under_tank {
-                    let empty_count = bytecount::count(pixels, 0);
-                    if empty_count > 0 {
-                        if empty_count < tank_width as usize {
-                            // Landscape under tank is not empty - clear it
-                            pixels.iter_mut().for_each(|c| *c = 0);
-                            res = true;
-                        }
-                        // Get down tank
-                        tank.offset(0., 1.);
-                    } else {
-                        break 'speed;
-                    }
-                }
+            if tank.update(&mut self.landscape) {
+                res = true; // landscape has changed
             }
         }
 
         res
     }
 
-    pub fn update_missile(&mut self, width: f32, height: f32) {
-        let width = width as i32;
-        let height = height as i32;
-
+    pub fn update_missile(&mut self) {
         if let Some(missile) = self.missile.as_mut() {
-            let mut destroy_missile = false;
-
-            for (x, y) in missile.positions_iter(None) {
-                if x < 0 || x >= width || y >= height {
-                    destroy_missile = true;
-                } else if self.landscape.is_not_empty(x, y) {
-                    destroy_missile = true;
-                    break;
-                }
-            }
-
-            if destroy_missile {
+            if missile.update(&self.landscape) {
                 self.missile = None;
             }
+            //            let mut destroy_missile = false;
+            //            for (x, y) in missile.positions_iter(self.width, self.height, None) {
+            //                if self.landscape.is_not_empty(x, y) {
+            //                    destroy_missile = true;
+            //                    break;
+            //                }
+            //            }
+            //
+            //            if destroy_missile {
+            //                self.missile = None;
+            //            }
         }
     }
 
@@ -132,6 +115,15 @@ impl GameState {
             Some(tank) => tank.power,
             None => 0.0,
         }
+    }
+
+    #[inline]
+    pub fn missile_speed(&self) -> f32 {
+        if let Some(missile) = self.missile.as_ref() {
+            let velocity = missile.cur_velocity();
+            return velocity.magnitude();
+        }
+        0.0
     }
 
     /// Increment power of gun of current tank

@@ -1,7 +1,5 @@
 use noise::{self, Fbm, MultiFractal, NoiseFn, Seedable};
 
-use crate::Point2;
-
 pub struct Landscape {
     width: u32,
     height: u32,
@@ -105,8 +103,8 @@ impl Landscape {
     }
 
     /// Get mutable slice with row of pixels given length
-    pub fn get_pixels_line_mut(&mut self, point: Point2, length: u32) -> Option<&mut [u8]> {
-        let (x, y) = (point.x as i32, point.y as i32);
+    pub fn get_pixels_line_mut(&mut self, point: (i32, i32), length: u32) -> Option<&mut [u8]> {
+        let (x, y) = point;
         if x < 0 || y < 0 || x >= self.width as _ || y >= self.height as _ || length == 0 {
             return None;
         }
