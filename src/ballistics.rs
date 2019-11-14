@@ -142,7 +142,7 @@ impl<'a> Iterator for BallisticsPosIterator<'a> {
             if let Some((width, height)) = self.borders {
                 let (x, y) = pos_i32;
                 let horizontal_rebound = x < 0 || x >= width;
-                let vertical_rebound = y < 0 || y >= height;
+                let vertical_rebound = y < 0 || y > height;
                 if horizontal_rebound || vertical_rebound {
                     self.ballistics
                         .apply_rebound(horizontal_rebound, vertical_rebound);

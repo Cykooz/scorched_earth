@@ -7,6 +7,7 @@ pub struct Landscape {
     noise: Option<Fbm>,
     amplitude: f64,
     pub dx: i32,
+    pub changed: bool,
 }
 
 impl Landscape {
@@ -31,6 +32,7 @@ impl Landscape {
             amplitude: f64::from(height) / 2.,
             dx: 0,
             noise: Some(noise),
+            changed: true,
         })
     }
 

@@ -1,10 +1,10 @@
+use cgmath::InnerSpace;
 use ggez::graphics::Color;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
-use crate::G;
-use crate::{Landscape, Missile, Tank, Vector2};
-use cgmath::InnerSpace;
+use crate::explosion::Explosion;
+use crate::{Landscape, Missile, Tank, Vector2, G};
 
 pub struct GameState {
     pub rng: ThreadRng,
@@ -15,6 +15,7 @@ pub struct GameState {
     pub tanks: Vec<Tank>,
     pub current_tank: usize,
     pub missile: Option<Missile>,
+    pub explosion: Option<Explosion>,
 }
 
 impl GameState {
@@ -26,22 +27,23 @@ impl GameState {
         landscape.generate();
 
         let tanks = vec![
-            Tank::new([100., 50.].into(), Color::from_rgb(245, 71, 32)),
-            Tank::new([width - 100., 50.].into(), Color::from_rgb(42, 219, 39)),
+            Tank::new([100., 50.], Color::from_rgb(245, 71, 32)),
+            Tank::new([width - 100., 50.], Color::from_rgb(42, 219, 39)),
         ];
 
-        let wind_power = (rng.gen_range(-10.0_f32, 10.0_f32) * 10.0).round() / 10.0;
-
-        Ok(GameState {
+        let mut state = GameState {
             rng,
             width,
             height,
             landscape,
-            wind_power,
+            wind_power: 0.0,
             tanks,
             current_tank: 0,
             missile: None,
-        })
+            explosion: None,
+        };
+        state.change_wind();
+        Ok(state)
     }
 
     #[inline]
@@ -53,38 +55,43 @@ impl GameState {
     pub fn regenerate_landscape(&mut self) {
         self.landscape.generate();
         for tank in self.tanks.iter_mut() {
-            tank.throw_down();
+            tank.throw_down(Some(50.));
         }
+        self.change_wind();
     }
 
-    pub fn update_landscape(&mut self) -> bool {
-        let mut res = false;
+    fn change_wind(&mut self) {
+        self.wind_power = (self.rng.gen_range(-10.0_f32, 10.0_f32) * 10.0).round() / 10.0;
+    }
 
+    pub fn update_tanks(&mut self) {
         for tank in self.tanks.iter_mut() {
-            if tank.update(&mut self.landscape) {
-                res = true; // landscape has changed
-            }
+            tank.update(&mut self.landscape)
         }
-
-        res
     }
 
     pub fn update_missile(&mut self) {
         if let Some(missile) = self.missile.as_mut() {
-            if missile.update(&self.landscape) {
+            if let Some(pos) = missile.update(&self.landscape) {
                 self.missile = None;
+                self.explosion = Some(Explosion::new(pos, 50.0));
             }
-            //            let mut destroy_missile = false;
-            //            for (x, y) in missile.positions_iter(self.width, self.height, None) {
-            //                if self.landscape.is_not_empty(x, y) {
-            //                    destroy_missile = true;
-            //                    break;
-            //                }
-            //            }
-            //
-            //            if destroy_missile {
-            //                self.missile = None;
-            //            }
+        }
+    }
+
+    pub fn update_explosion(&mut self) {
+        if let Some(explosion) = self.explosion.as_mut() {
+            if explosion.update(&mut self.landscape) {
+                self.explosion = None;
+                self.current_tank += 1;
+                if self.current_tank >= self.tanks.len() {
+                    self.current_tank = 0;
+                }
+                for tank in self.tanks.iter_mut() {
+                    tank.throw_down(None);
+                }
+                self.change_wind();
+            }
         }
     }
 
@@ -140,7 +147,7 @@ impl GameState {
     }
 
     pub fn shoot(&mut self) {
-        if self.missile.is_none() {
+        if self.missile.is_none() && self.explosion.is_none() {
             if let Some(tank) = self.tanks.get(self.current_tank) {
                 let acceleration = Vector2::new(self.wind_power, G);
                 self.missile = Some(tank.shoot(acceleration));

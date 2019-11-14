@@ -8,6 +8,7 @@ pub use types::*;
 
 mod assets;
 mod ballistics;
+mod explosion;
 mod game_state;
 mod landscape;
 mod missile;

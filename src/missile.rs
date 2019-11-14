@@ -1,5 +1,6 @@
-use crate::{Ballistics, Landscape, Point2, Vector2};
 use std::f32::consts::PI;
+
+use crate::{Ballistics, Landscape, Point2, Vector2};
 
 const TIME_SCALE: f32 = 3.0;
 
@@ -28,18 +29,16 @@ impl Missile {
         self.ballistics.pos_and_velocity().1
     }
 
-    pub fn update(&mut self, landscape: &Landscape) -> bool {
+    pub fn update(&mut self, landscape: &Landscape) -> Option<Point2> {
         let size = landscape.size();
         let borders = (size.0 as i32, size.1 as i32);
 
-        //        let mut destroy_missile = false;
-
         for (x, y) in self.ballistics.positions_iter(None, Some(borders)) {
-            if landscape.is_not_empty(x, y) {
-                return true;
+            if landscape.is_not_empty(x, y) || y >= borders.1 {
+                return Some(Point2::new(x as f32, y as f32));
             }
         }
 
-        false
+        None
     }
 }

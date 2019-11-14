@@ -1,9 +1,7 @@
-use ggez;
 use ggez::conf::{WindowMode, WindowSetup};
-use ggez::event::quit;
-use ggez::graphics;
 use ggez::input::keyboard::{KeyCode, KeyMods};
-use ggez::{event, GameError};
+use ggez::{event, graphics, GameError};
+
 use scorched_earth::{Assets, GameState, Point2, Vector2};
 
 struct MainState {
@@ -12,6 +10,7 @@ struct MainState {
     landscape_image: Option<graphics::Image>,
     borders_mesh: graphics::Mesh,
     missile_mesh: graphics::Mesh,
+    explosion_mesh: graphics::Mesh,
 }
 
 impl MainState {
@@ -38,6 +37,14 @@ impl MainState {
                 1.0,
                 graphics::WHITE,
             )?,
+            explosion_mesh: graphics::Mesh::new_circle(
+                ctx,
+                graphics::DrawMode::fill(),
+                Point2::new(0.0, 0.0),
+                1000.0,
+                0.5,
+                graphics::WHITE,
+            )?,
         };
         state.build_landscape_image(ctx)?;
 
@@ -51,17 +58,20 @@ impl MainState {
             self.game_state.height as u16,
             &self.game_state.landscape.to_rgba(),
         )?);
+        self.game_state.landscape.changed = false;
         Ok(())
     }
 }
 
 impl event::EventHandler for MainState {
     fn update(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
-        if self.game_state.update_landscape() || self.landscape_image.is_none() {
+        self.game_state.update_tanks();
+        self.game_state.update_missile();
+        self.game_state.update_explosion();
+
+        if self.landscape_image.is_none() || self.game_state.landscape.changed {
             self.build_landscape_image(ctx)?;
         }
-
-        self.game_state.update_missile();
 
         Ok(())
     }
@@ -98,6 +108,17 @@ impl event::EventHandler for MainState {
                 graphics::draw(ctx, &self.missile_mesh, (missile.cur_pos(),))?;
             }
 
+            // Explosion
+            if let Some(explosion) = self.game_state.explosion.as_ref() {
+                let scale = explosion.cur_radius / 1000.0;
+                let alpha = (explosion.cur_opacity * 255.0) as u8;
+                let draw_params = graphics::DrawParam::new()
+                    .dest(explosion.pos)
+                    .scale([scale, scale])
+                    .color(graphics::Color::from_rgba(242, 68, 15, alpha));
+                graphics::draw(ctx, &self.explosion_mesh, draw_params)?;
+            }
+
             graphics::pop_transform(ctx);
             graphics::apply_transformations(ctx)?;
         }
@@ -124,6 +145,11 @@ impl event::EventHandler for MainState {
         let dest_point = Point2::new(220.0, 10.0);
         graphics::draw(ctx, &text, (dest_point,))?;
 
+        let player = self.game_state.current_tank + 1;
+        let text = graphics::Text::new((format!("Player: {}", player), self.assets.font, 20.0));
+        let dest_point = Point2::new(440.0, 10.0);
+        graphics::draw(ctx, &text, (dest_point,))?;
+
         graphics::present(ctx)?;
         Ok(())
     }
@@ -136,7 +162,7 @@ impl event::EventHandler for MainState {
         _repeat: bool,
     ) {
         if keycode == KeyCode::Escape {
-            quit(ctx);
+            event::quit(ctx);
         }
         if keycode == KeyCode::Delete {
             self.game_state.update_landscape_seed();

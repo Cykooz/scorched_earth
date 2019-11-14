@@ -19,7 +19,11 @@ pub struct Tank {
 }
 
 impl Tank {
-    pub fn new(top_left: Point2, color: Color) -> Tank {
+    pub fn new<P>(top_left: P, color: Color) -> Tank
+    where
+        P: Into<Point2>,
+    {
+        let top_left: Point2 = top_left.into();
         let rect = Rect::new(top_left.x, top_left.y, TANK_SIZE, TANK_SIZE);
         let mut tank = Tank {
             rect,
@@ -28,7 +32,7 @@ impl Tank {
             power: 40.0,
             throwing: None,
         };
-        tank.throw_down();
+        tank.throw_down(None);
         tank
     }
 
@@ -61,27 +65,26 @@ impl Tank {
         )
     }
 
-    pub fn update(&mut self, landscape: &mut Landscape) -> bool {
-        let height = landscape.size().1 as i32;
-        let tank_width = self.rect.w as u32;
-        let mut res = false;
-        let mut offset: f32 = 0.0;
-
+    pub fn update(&mut self, landscape: &mut Landscape) {
         if let Some(ballistics) = self.throwing.as_mut() {
+            let height = landscape.size().1 as i32;
+            let tank_width = self.rect.w as u32;
+            let mut offset: f32 = 0.0;
+
             for (x, y) in ballistics.positions_iter(None, None) {
                 if y >= height {
                     self.throwing = None;
                     break;
                 }
 
-                let pixels_under_tank = landscape.get_pixels_line_mut((x, y + 1), tank_width);
+                let pixels_under_tank = landscape.get_pixels_line_mut((x, y), tank_width);
                 if let Some(pixels) = pixels_under_tank {
                     let empty_count = bytecount::count(pixels, 0);
                     if empty_count > 0 {
                         if empty_count < tank_width as usize {
                             // Landscape under tank is not empty - clear it
                             pixels.iter_mut().for_each(|c| *c = 0);
-                            res = true;
+                            landscape.changed = true;
                         }
                         // Get down tank
                         offset += 1.0;
@@ -91,23 +94,24 @@ impl Tank {
                     }
                 }
             }
-        }
-        if offset > 0. {
-            self.rect.translate([0., offset]);
-        }
 
-        res
+            if offset > 0. {
+                self.rect.translate([0., offset]);
+            }
+        }
     }
 
-    pub fn throw_down(&mut self) {
-        if self.throwing.is_none() {
-            self.throwing = Some(Ballistics::new(
-                [self.rect.x, self.rect.bottom() - 1.],
-                [0., 0.],
-                [0., G],
-                TIME_SCALE,
-            ));
+    pub fn throw_down(&mut self, top: Option<f32>) {
+        if let Some(top) = top {
+            self.rect.y = top;
         }
+
+        self.throwing = Some(Ballistics::new(
+            [self.rect.x, self.rect.bottom() - 1.],
+            [0., 0.],
+            [0., G],
+            TIME_SCALE,
+        ));
     }
 }
 
@@ -117,7 +121,7 @@ mod tests {
 
     #[test]
     fn test_bottom_left() {
-        let tank = Tank::new([0., 0.].into(), (0, 0, 0).into());
+        let tank = Tank::new([0., 0.], (0, 0, 0).into());
         assert_eq!(tank.bottom_left(), [0., TANK_SIZE - 1.].into());
     }
 }
