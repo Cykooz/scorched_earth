@@ -1,4 +1,8 @@
+use crate::G;
 use noise::{self, Fbm, MultiFractal, NoiseFn, Seedable};
+use std::time::Instant;
+
+const TIME_SCALE: f32 = 3.0;
 
 pub struct Landscape {
     width: u32,
@@ -8,6 +12,8 @@ pub struct Landscape {
     amplitude: f64,
     pub dx: i32,
     pub changed: bool,
+    subsidence_started: Option<Instant>,
+    subsidence_rows_count: u32,
 }
 
 impl Landscape {
@@ -33,6 +39,8 @@ impl Landscape {
             dx: 0,
             noise: Some(noise),
             changed: true,
+            subsidence_started: None,
+            subsidence_rows_count: 0,
         })
     }
 
@@ -89,21 +97,6 @@ impl Landscape {
         }
     }
 
-    /// Gets iterator through coordinates of not empty points of landscape.
-    #[inline]
-    pub fn iter_filled_points(&self) -> impl Iterator<Item = (i32, i32)> + '_ {
-        let width = self.width;
-        self.buffer.iter().enumerate().filter_map(move |(i, v)| {
-            if *v > 0 {
-                let x = i as u32 % width;
-                let y = i as u32 / width;
-                Some((x as _, y as _))
-            } else {
-                None
-            }
-        })
-    }
-
     /// Get mutable slice with row of pixels given length
     pub fn get_pixels_line_mut(&mut self, point: (i32, i32), length: u32) -> Option<&mut [u8]> {
         let (x, y) = point;
@@ -131,10 +124,57 @@ impl Landscape {
             rgba.align_to_mut::<u32>().1
         };
         for (&v, d) in self.buffer.iter().zip(buf) {
-            *d = if v == 0 { 0 } else { 0xff_cf_bd_00 }
+            *d = if v == 0 { 0 } else { 0xff_40_71_9c } // 0xff_cf_bd_00
         }
 
         rgba
+    }
+
+    pub fn subsidence(&mut self) {
+        if self.subsidence_started.is_none() {
+            self.subsidence_started = Some(Instant::now());
+            self.subsidence_rows_count = 0;
+        }
+    }
+
+    pub fn is_subsidence(&self) -> bool {
+        self.subsidence_started.is_some()
+    }
+
+    pub fn update(&mut self) -> bool {
+        if let Some(subsidence_started) = self.subsidence_started {
+            let time = subsidence_started.elapsed().as_secs_f32();
+            let subsidence_rows_count = (G * time * time * TIME_SCALE).round() as u32;
+            let delta = subsidence_rows_count - self.subsidence_rows_count;
+            self.subsidence_rows_count = subsidence_rows_count;
+
+            for _ in 0..delta {
+                let mut changed = false;
+                for y in (1..self.height).rev() {
+                    let split_from = (y * self.width) as usize;
+                    let (top_rows, current_row) = self.buffer.split_at_mut(split_from);
+
+                    let top_row_iter = top_rows.iter_mut().skip(split_from - self.width as usize);
+                    top_row_iter
+                        .zip(current_row)
+                        .filter(|(&mut top_pixel, &mut cur_pixel)| cur_pixel == 0 && top_pixel != 0)
+                        .for_each(|(top_pixel, cur_pixel)| {
+                            *cur_pixel = *top_pixel;
+                            *top_pixel = 0;
+                            changed = true;
+                        });
+                }
+
+                if changed {
+                    self.changed = true;
+                } else {
+                    self.subsidence_started = None;
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 }
 

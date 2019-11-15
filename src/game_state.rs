@@ -64,13 +64,20 @@ impl GameState {
         self.wind_power = (self.rng.gen_range(-10.0_f32, 10.0_f32) * 10.0).round() / 10.0;
     }
 
-    pub fn update_tanks(&mut self) {
+    pub fn update(&mut self) {
+        self.update_tanks();
+        self.update_missile();
+        self.update_explosion();
+        self.update_landscape();
+    }
+
+    fn update_tanks(&mut self) {
         for tank in self.tanks.iter_mut() {
             tank.update(&mut self.landscape)
         }
     }
 
-    pub fn update_missile(&mut self) {
+    fn update_missile(&mut self) {
         if let Some(missile) = self.missile.as_mut() {
             if let Some(pos) = missile.update(&self.landscape) {
                 self.missile = None;
@@ -79,19 +86,25 @@ impl GameState {
         }
     }
 
-    pub fn update_explosion(&mut self) {
+    fn update_explosion(&mut self) {
         if let Some(explosion) = self.explosion.as_mut() {
             if explosion.update(&mut self.landscape) {
                 self.explosion = None;
-                self.current_tank += 1;
-                if self.current_tank >= self.tanks.len() {
-                    self.current_tank = 0;
-                }
-                for tank in self.tanks.iter_mut() {
-                    tank.throw_down(None);
-                }
-                self.change_wind();
+                self.landscape.subsidence();
             }
+        }
+    }
+
+    fn update_landscape(&mut self) {
+        if self.landscape.update() {
+            self.current_tank += 1;
+            if self.current_tank >= self.tanks.len() {
+                self.current_tank = 0;
+            }
+            for tank in self.tanks.iter_mut() {
+                tank.throw_down(None);
+            }
+            self.change_wind();
         }
     }
 
@@ -147,7 +160,7 @@ impl GameState {
     }
 
     pub fn shoot(&mut self) {
-        if self.missile.is_none() && self.explosion.is_none() {
+        if self.missile.is_none() && self.explosion.is_none() && !self.landscape.is_subsidence() {
             if let Some(tank) = self.tanks.get(self.current_tank) {
                 let acceleration = Vector2::new(self.wind_power, G);
                 self.missile = Some(tank.shoot(acceleration));

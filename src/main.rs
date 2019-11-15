@@ -65,9 +65,7 @@ impl MainState {
 
 impl event::EventHandler for MainState {
     fn update(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
-        self.game_state.update_tanks();
-        self.game_state.update_missile();
-        self.game_state.update_explosion();
+        self.game_state.update();
 
         if self.landscape_image.is_none() || self.game_state.landscape.changed {
             self.build_landscape_image(ctx)?;
