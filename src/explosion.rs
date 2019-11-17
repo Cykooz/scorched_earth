@@ -38,33 +38,37 @@ impl Explosion {
         self.cur_radius = radius.min(self.max_radius);
 
         if !self.landscape_updated && radius >= self.max_radius {
-            let circle = line_drawing::BresenhamCircle::new(
-                self.pos.x as i32,
-                self.pos.y as i32,
-                self.max_radius as i32 - 1,
-            );
-            for points_iter in &circle.chunks(4) {
-                let points: Vec<(i32, i32)> = points_iter.step_by(2).collect();
-                if points.len() != 2 {
-                    break;
-                }
-                let (x1, y1) = points[0];
-                let (x2, y2) = points[1];
-                let x = x1.min(x2).max(0);
-                let len = (x1.max(x2).max(0) - x) as u32;
-                if len == 0 {
-                    continue;
-                }
-                for &y in [y1, y2].iter() {
-                    if let Some(pixels) = landscape.get_pixels_line_mut((x, y), len) {
-                        pixels.iter_mut().for_each(|c| *c = 0);
-                    }
-                }
-            }
-            landscape.changed = true;
-            self.landscape_updated = true;
+            self.destroy_landscape(landscape);
         }
 
         self.cur_opacity <= 0.0
+    }
+
+    fn destroy_landscape(&mut self, landscape: &mut Landscape) {
+        let circle = line_drawing::BresenhamCircle::new(
+            self.pos.x as i32,
+            self.pos.y as i32,
+            self.max_radius as i32 - 1,
+        );
+        for points_iter in &circle.chunks(4) {
+            let points: Vec<(i32, i32)> = points_iter.step_by(2).collect();
+            if points.len() != 2 {
+                break;
+            }
+            let (x1, y1) = points[0];
+            let (x2, y2) = points[1];
+            let x = x1.min(x2).max(0);
+            let len = (x1.max(x2).max(0) - x) as u16;
+            if len == 0 {
+                continue;
+            }
+            for &y in [y1, y2].iter() {
+                if let Some(pixels) = landscape.get_pixels_line_mut((x, y), len) {
+                    pixels.iter_mut().for_each(|c| *c = 0);
+                }
+            }
+        }
+        landscape.changed = true;
+        self.landscape_updated = true;
     }
 }

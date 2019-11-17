@@ -56,7 +56,7 @@ impl MainState {
             ctx,
             self.game_state.width as u16,
             self.game_state.height as u16,
-            &self.game_state.landscape.to_rgba(),
+            self.game_state.landscape.build_rgba(),
         )?);
         self.game_state.landscape.changed = false;
         Ok(())
@@ -85,7 +85,6 @@ impl event::EventHandler for MainState {
 
             // Landscape
             if let Some(image) = &self.landscape_image {
-                //let dst = Point2::new(0.0, 0.0);
                 graphics::draw(ctx, image, ([0.0, 0.0],))?;
             }
 

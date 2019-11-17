@@ -68,7 +68,8 @@ impl Tank {
     pub fn update(&mut self, landscape: &mut Landscape) {
         if let Some(ballistics) = self.throwing.as_mut() {
             let height = landscape.size().1 as i32;
-            let tank_width = self.rect.w as u32;
+            let tank_width = self.rect.w;
+            let max_empty_count = (0.3 * tank_width).round() as usize;
             let mut offset: f32 = 0.0;
 
             for (x, y) in ballistics.positions_iter(None, None) {
@@ -77,10 +78,10 @@ impl Tank {
                     break;
                 }
 
-                let pixels_under_tank = landscape.get_pixels_line_mut((x, y), tank_width);
+                let pixels_under_tank = landscape.get_pixels_line_mut((x, y), tank_width as u16);
                 if let Some(pixels) = pixels_under_tank {
                     let empty_count = bytecount::count(pixels, 0);
-                    if empty_count > 0 {
+                    if empty_count > max_empty_count {
                         if empty_count < tank_width as usize {
                             // Landscape under tank is not empty - clear it
                             pixels.iter_mut().for_each(|c| *c = 0);

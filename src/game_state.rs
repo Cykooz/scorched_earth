@@ -21,7 +21,7 @@ pub struct GameState {
 impl GameState {
     pub fn new(width: f32, height: f32) -> Result<GameState, String> {
         let mut rng = rand::thread_rng();
-        let mut landscape = Landscape::new(width as u32, height as u32)?;
+        let mut landscape = Landscape::new(width as u16, height as u16)?;
         landscape.set_seed(rng.gen());
         landscape.dx = rng.gen_range(0, width as i32 / 2);
         landscape.generate();
