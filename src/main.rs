@@ -65,7 +65,7 @@ impl MainState {
 
 impl event::EventHandler for MainState {
     fn update(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
-        self.game_state.update();
+        self.game_state.update(&mut self.assets);
 
         if self.landscape_image.is_none() || self.game_state.landscape.changed {
             self.build_landscape_image(ctx)?;
@@ -179,7 +179,7 @@ impl event::EventHandler for MainState {
             self.game_state.inc_gun_power(-1.0);
         }
         if keycode == KeyCode::Space {
-            self.game_state.shoot();
+            self.game_state.shoot(&mut self.assets)
         }
     }
 }

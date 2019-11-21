@@ -4,7 +4,8 @@ use rand::rngs::ThreadRng;
 use rand::Rng;
 
 use crate::explosion::Explosion;
-use crate::{Landscape, Missile, Tank, Vector2, G};
+use crate::{Assets, Landscape, Missile, Tank, Vector2, G};
+use ggez::audio::SoundSource;
 
 pub struct GameState {
     pub rng: ThreadRng,
@@ -64,9 +65,9 @@ impl GameState {
         self.wind_power = (self.rng.gen_range(-10.0_f32, 10.0_f32) * 10.0).round() / 10.0;
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self, assets: &mut Assets) {
         self.update_tanks();
-        self.update_missile();
+        self.update_missile(assets);
         self.update_explosion();
         self.update_landscape();
     }
@@ -77,11 +78,12 @@ impl GameState {
         }
     }
 
-    fn update_missile(&mut self) {
+    fn update_missile(&mut self, assets: &mut Assets) {
         if let Some(missile) = self.missile.as_mut() {
             if let Some(pos) = missile.update(&self.landscape) {
                 self.missile = None;
                 self.explosion = Some(Explosion::new(pos, 50.0));
+                assets.explosion_sound.play().unwrap();
             }
         }
     }
@@ -159,11 +161,12 @@ impl GameState {
         }
     }
 
-    pub fn shoot(&mut self) {
+    pub fn shoot(&mut self, assets: &mut Assets) {
         if self.missile.is_none() && self.explosion.is_none() && !self.landscape.is_subsidence() {
             if let Some(tank) = self.tanks.get(self.current_tank) {
                 let acceleration = Vector2::new(self.wind_power, G);
                 self.missile = Some(tank.shoot(acceleration));
+                assets.tank_fire_sound.play().unwrap();
             }
         }
     }

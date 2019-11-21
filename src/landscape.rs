@@ -149,7 +149,7 @@ impl Landscape {
         self.subsidence_started.is_some()
     }
 
-    // Returns `true` if current subsidence has finished.
+    /// Returns `true` if current subsidence has finished.
     pub fn update(&mut self) -> bool {
         if let Some(subsidence_started) = self.subsidence_started {
             let time = subsidence_started.elapsed().as_secs_f32();
