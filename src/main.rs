@@ -2,10 +2,10 @@ use ggez::conf::{WindowMode, WindowSetup};
 use ggez::input::keyboard::{KeyCode, KeyMods};
 use ggez::{event, graphics, GameError};
 
-use scorched_earth::{Assets, GameState, Point2, Vector2};
+use scorched_earth::{Assets, GameState, Point2, Round, Vector2};
 
 struct MainState {
-    game_state: GameState,
+    game_round: Round,
     assets: Assets,
     landscape_image: Option<graphics::Image>,
     borders_mesh: graphics::Mesh,
@@ -16,11 +16,11 @@ struct MainState {
 impl MainState {
     fn new(ctx: &mut ggez::Context) -> ggez::GameResult<MainState> {
         let (width, height) = screen_size(ctx);
-        let game_state =
-            GameState::new(width - 2.0, height - 2.0).map_err(GameError::ResourceLoadError)?;
+        let game_round =
+            Round::new(width - 2.0, height - 2.0).map_err(GameError::ResourceLoadError)?;
 
         let mut state = MainState {
-            game_state,
+            game_round,
             landscape_image: None,
             assets: Assets::new(ctx)?,
             borders_mesh: graphics::Mesh::new_rectangle(
@@ -54,20 +54,20 @@ impl MainState {
     fn build_landscape_image(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
         self.landscape_image = Some(graphics::Image::from_rgba8(
             ctx,
-            self.game_state.width as u16,
-            self.game_state.height as u16,
-            self.game_state.landscape.build_rgba(),
+            self.game_round.width as u16,
+            self.game_round.height as u16,
+            self.game_round.landscape.build_rgba(),
         )?);
-        self.game_state.landscape.changed = false;
+        self.game_round.landscape.changed = false;
         Ok(())
     }
 }
 
 impl event::EventHandler for MainState {
     fn update(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
-        self.game_state.update(&mut self.assets);
+        self.game_round.update(&mut self.assets);
 
-        if self.landscape_image.is_none() || self.game_state.landscape.changed {
+        if self.landscape_image.is_none() || self.game_round.landscape.changed {
             self.build_landscape_image(ctx)?;
         }
 
@@ -89,7 +89,7 @@ impl event::EventHandler for MainState {
             }
 
             // Tanks
-            for tank in &self.game_state.tanks {
+            for tank in &self.game_round.tanks {
                 let pos = tank.top_left();
                 let gun_params = graphics::DrawParam::new()
                     .dest(pos + Vector2::new(20.5, 20.5))
@@ -101,12 +101,12 @@ impl event::EventHandler for MainState {
             }
 
             // Missile
-            if let Some(missile) = self.game_state.missile.as_ref() {
+            if let GameState::FlyingOfMissile(ref missile) = self.game_round.state {
                 graphics::draw(ctx, &self.missile_mesh, (missile.cur_pos(),))?;
             }
 
             // Explosion
-            if let Some(explosion) = self.game_state.explosion.as_ref() {
+            if let GameState::Exploding(ref explosion) = self.game_round.state {
                 let scale = explosion.cur_radius / 1000.0;
                 let alpha = (explosion.cur_opacity * 255.0) as u8;
                 let draw_params = graphics::DrawParam::new()
@@ -124,25 +124,25 @@ impl event::EventHandler for MainState {
         graphics::draw(ctx, &self.borders_mesh, (Point2::new(1.0, 0.0),))?;
 
         // Status line
-        let angle = self.game_state.gun_angle();
+        let angle = self.game_round.gun_angle();
         let text = graphics::Text::new((format!("Angle: {}", angle), self.assets.font, 20.0));
         let dest_point = Point2::new(10.0, 10.0);
         graphics::draw(ctx, &text, (dest_point,))?;
 
-        let power = self.game_state.gun_power();
+        let power = self.game_round.gun_power();
         let text = graphics::Text::new((format!("Power: {}", power), self.assets.font, 20.0));
         let dest_point = Point2::new(110.0, 10.0);
         graphics::draw(ctx, &text, (dest_point,))?;
 
         let text = graphics::Text::new((
-            format!("Wind: {}", self.game_state.wind_power * 10.0),
+            format!("Wind: {}", self.game_round.wind_power * 10.0),
             self.assets.font,
             20.0,
         ));
         let dest_point = Point2::new(220.0, 10.0);
         graphics::draw(ctx, &text, (dest_point,))?;
 
-        let player = self.game_state.current_tank + 1;
+        let player = self.game_round.current_tank + 1;
         let text = graphics::Text::new((format!("Player: {}", player), self.assets.font, 20.0));
         let dest_point = Point2::new(440.0, 10.0);
         graphics::draw(ctx, &text, (dest_point,))?;
@@ -162,24 +162,24 @@ impl event::EventHandler for MainState {
             event::quit(ctx);
         }
         if keycode == KeyCode::Delete {
-            self.game_state.update_landscape_seed();
-            self.game_state.regenerate_landscape();
+            self.game_round.update_landscape_seed();
+            self.game_round.regenerate_landscape();
             self.landscape_image = None;
         }
         if keycode == KeyCode::Left {
-            self.game_state.inc_gun_angle(-1.0);
+            self.game_round.inc_gun_angle(-1.0);
         }
         if keycode == KeyCode::Right {
-            self.game_state.inc_gun_angle(1.0);
+            self.game_round.inc_gun_angle(1.0);
         }
         if keycode == KeyCode::Up {
-            self.game_state.inc_gun_power(1.0);
+            self.game_round.inc_gun_power(1.0);
         }
         if keycode == KeyCode::Down {
-            self.game_state.inc_gun_power(-1.0);
+            self.game_round.inc_gun_power(-1.0);
         }
         if keycode == KeyCode::Space {
-            self.game_state.shoot(&mut self.assets)
+            self.game_round.shoot(&mut self.assets)
         }
     }
 }

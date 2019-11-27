@@ -18,6 +18,19 @@ pub struct Tank {
     throwing: Option<Ballistics>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TankState {
+    Placed,
+    Dropped,
+}
+
+impl TankState {
+    #[inline]
+    pub fn is_placed(self) -> bool {
+        self == TankState::Placed
+    }
+}
+
 impl Tank {
     pub fn new<P>(top_left: P, color: Color) -> Tank
     where
@@ -65,7 +78,7 @@ impl Tank {
         )
     }
 
-    pub fn update(&mut self, landscape: &mut Landscape) {
+    pub fn update(&mut self, landscape: &mut Landscape) -> TankState {
         if let Some(ballistics) = self.throwing.as_mut() {
             let height = landscape.size().1 as i32;
             let tank_width = self.rect.w;
@@ -99,6 +112,12 @@ impl Tank {
             if offset > 0. {
                 self.rect.translate([0., offset]);
             }
+        }
+
+        if self.throwing.is_none() {
+            TankState::Placed
+        } else {
+            TankState::Dropped
         }
     }
 

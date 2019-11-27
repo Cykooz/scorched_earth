@@ -1,6 +1,7 @@
 pub use assets::Assets;
 pub use ballistics::Ballistics;
-pub use game_state::GameState;
+pub use explosion::Explosion;
+pub use game_state::{GameState, Round};
 pub use landscape::Landscape;
 pub use missile::Missile;
 pub use tank::Tank;

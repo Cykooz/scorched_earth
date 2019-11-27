@@ -1,13 +1,21 @@
 use cgmath::InnerSpace;
+use ggez::audio::SoundSource;
 use ggez::graphics::Color;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
-use crate::explosion::Explosion;
-use crate::{Assets, Landscape, Missile, Tank, Vector2, G};
-use ggez::audio::SoundSource;
+use crate::{Assets, Explosion, Landscape, Missile, Tank, Vector2, G};
 
-pub struct GameState {
+#[derive(Debug, Clone, Copy)]
+pub enum GameState {
+    TanksThrowing,
+    Aiming,
+    FlyingOfMissile(Missile),
+    Exploding(Explosion),
+    Subsidence,
+}
+
+pub struct Round {
     pub rng: ThreadRng,
     pub width: f32,
     pub height: f32,
@@ -15,12 +23,11 @@ pub struct GameState {
     pub wind_power: f32,
     pub tanks: Vec<Tank>,
     pub current_tank: usize,
-    pub missile: Option<Missile>,
-    pub explosion: Option<Explosion>,
+    pub state: GameState,
 }
 
-impl GameState {
-    pub fn new(width: f32, height: f32) -> Result<GameState, String> {
+impl Round {
+    pub fn new(width: f32, height: f32) -> Result<Round, String> {
         let mut rng = rand::thread_rng();
         let mut landscape = Landscape::new(width as u16, height as u16)?;
         landscape.set_seed(rng.gen());
@@ -32,7 +39,7 @@ impl GameState {
             Tank::new([width - 100., 50.], Color::from_rgb(42, 219, 39)),
         ];
 
-        let mut state = GameState {
+        let mut round = Round {
             rng,
             width,
             height,
@@ -40,11 +47,10 @@ impl GameState {
             wind_power: 0.0,
             tanks,
             current_tank: 0,
-            missile: None,
-            explosion: None,
+            state: GameState::TanksThrowing,
         };
-        state.change_wind();
-        Ok(state)
+        round.change_wind();
+        Ok(round)
     }
 
     #[inline]
@@ -73,40 +79,49 @@ impl GameState {
     }
 
     fn update_tanks(&mut self) {
-        for tank in self.tanks.iter_mut() {
-            tank.update(&mut self.landscape)
+        if let GameState::TanksThrowing = self.state {
+            let mut all_placed = true;
+            for tank in self.tanks.iter_mut() {
+                all_placed &= tank.update(&mut self.landscape).is_placed();
+            }
+
+            if all_placed {
+                self.state = GameState::Aiming;
+            }
         }
     }
 
     fn update_missile(&mut self, assets: &mut Assets) {
-        if let Some(missile) = self.missile.as_mut() {
+        if let GameState::FlyingOfMissile(ref mut missile) = self.state {
             if let Some(pos) = missile.update(&self.landscape) {
-                self.missile = None;
-                self.explosion = Some(Explosion::new(pos, 50.0));
                 assets.explosion_sound.play().unwrap();
+                self.state = GameState::Exploding(Explosion::new(pos, 50.0));
             }
         }
     }
 
     fn update_explosion(&mut self) {
-        if let Some(explosion) = self.explosion.as_mut() {
+        if let GameState::Exploding(ref mut explosion) = self.state {
             if explosion.update(&mut self.landscape) {
-                self.explosion = None;
                 self.landscape.subsidence();
+                self.state = GameState::Subsidence;
             }
         }
     }
 
     fn update_landscape(&mut self) {
-        if self.landscape.update() {
-            self.current_tank += 1;
-            if self.current_tank >= self.tanks.len() {
-                self.current_tank = 0;
+        if let GameState::Subsidence = self.state {
+            if self.landscape.update() {
+                self.current_tank += 1;
+                if self.current_tank >= self.tanks.len() {
+                    self.current_tank = 0;
+                }
+                for tank in self.tanks.iter_mut() {
+                    tank.throw_down(None);
+                }
+                self.change_wind();
+                self.state = GameState::TanksThrowing;
             }
-            for tank in self.tanks.iter_mut() {
-                tank.throw_down(None);
-            }
-            self.change_wind();
         }
     }
 
@@ -125,23 +140,21 @@ impl GameState {
 
     #[inline]
     pub fn gun_angle(&self) -> f32 {
-        match self.tanks.get(self.current_tank) {
-            Some(tank) => tank.angle,
-            None => 90.0,
-        }
+        self.tanks
+            .get(self.current_tank)
+            .map_or_else(|| 90.0, |tank| tank.angle)
     }
 
     #[inline]
     pub fn gun_power(&self) -> f32 {
-        match self.tanks.get(self.current_tank) {
-            Some(tank) => tank.power,
-            None => 0.0,
-        }
+        self.tanks
+            .get(self.current_tank)
+            .map_or_else(|| 0.0, |tank| tank.power)
     }
 
     #[inline]
     pub fn missile_speed(&self) -> f32 {
-        if let Some(missile) = self.missile.as_ref() {
+        if let GameState::FlyingOfMissile(ref missile) = self.state {
             let velocity = missile.cur_velocity();
             return velocity.magnitude();
         }
@@ -162,11 +175,11 @@ impl GameState {
     }
 
     pub fn shoot(&mut self, assets: &mut Assets) {
-        if self.missile.is_none() && self.explosion.is_none() && !self.landscape.is_subsidence() {
+        if let GameState::Aiming = self.state {
             if let Some(tank) = self.tanks.get(self.current_tank) {
-                let acceleration = Vector2::new(self.wind_power, G);
-                self.missile = Some(tank.shoot(acceleration));
                 assets.tank_fire_sound.play().unwrap();
+                let acceleration = Vector2::new(self.wind_power, G);
+                self.state = GameState::FlyingOfMissile(tank.shoot(acceleration));
             }
         }
     }
