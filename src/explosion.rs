@@ -1,7 +1,9 @@
-use itertools::Itertools;
 use std::time::Instant;
 
-use crate::{Landscape, Point2};
+use ggez::graphics::Rect;
+use itertools::Itertools;
+
+use crate::{Circle, Landscape, Point2};
 
 const SPEED: f32 = 150.0;
 
@@ -68,7 +70,20 @@ impl Explosion {
                 }
             }
         }
-        landscape.changed = true;
+        landscape.set_changed();
         self.landscape_updated = true;
+    }
+
+    pub fn get_intersection_percents(&self, bound: Rect) -> u8 {
+        let bound_area = bound.w * bound.h;
+        if bound_area > 0.0 {
+            let circle = Circle::new(self.pos, self.max_radius);
+            let intersection_area = circle.area_of_rect_intersection(bound);
+            if intersection_area > 0.0 {
+                let percents = 100.0 * intersection_area / bound_area;
+                return percents.min(100.0).max(0.0) as u8;
+            }
+        }
+        0
     }
 }

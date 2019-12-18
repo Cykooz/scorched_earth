@@ -1,7 +1,10 @@
-use crate::G;
+use std::time::Instant;
+
+use ggez::graphics;
 use itertools::Itertools;
 use noise::{self, Fbm, MultiFractal, NoiseFn, Seedable};
-use std::time::Instant;
+
+use crate::G;
 
 const TIME_SCALE: f32 = 3.0;
 
@@ -10,10 +13,10 @@ pub struct Landscape {
     height: i32,
     buffer: Vec<u8>,
     rgba_buffer: Vec<u8>,
-    noise: Option<Fbm>,
+    noise: Fbm,
     amplitude: f64,
     pub dx: i32,
-    pub changed: bool,
+    changed: bool,
     subsidence_started: Option<Instant>,
     // Last position of virtual pixel of landscape on the way of it falling.
     // Used for calculate speed of fall.
@@ -31,10 +34,6 @@ impl Landscape {
 
         let stride = width as usize;
         let res_size = stride * height as usize;
-        let noise = Fbm::new()
-            .set_seed(0)
-            .set_octaves(4)
-            .set_frequency(2. / f64::from(width));
         Ok(Landscape {
             width: width as i32,
             height: height as i32,
@@ -42,7 +41,7 @@ impl Landscape {
             rgba_buffer: vec![0; res_size * 4],
             amplitude: f64::from(height) / 2.,
             dx: 0,
-            noise: Some(noise),
+            noise: Self::create_noise(width as i32, 0),
             changed: true,
             subsidence_started: None,
             subsidence_last_pos: 0,
@@ -51,23 +50,29 @@ impl Landscape {
         })
     }
 
+    fn create_noise(width: i32, seed: u32) -> Fbm {
+        Fbm::new()
+            .set_seed(seed)
+            .set_octaves(4)
+            .set_frequency(2. / f64::from(width))
+    }
+
     pub fn set_seed(&mut self, seed: u32) {
-        let noise = std::mem::replace(&mut self.noise, None);
-        self.noise = Some(noise.unwrap().set_seed(seed));
+        self.noise = Self::create_noise(self.width, seed);
     }
 
     pub fn seed(&self) -> u32 {
-        self.noise.as_ref().unwrap().seed()
+        self.noise.seed()
     }
 
-    pub fn set_octaves(&mut self, octaves: usize) {
-        let noise = std::mem::replace(&mut self.noise, None);
-        self.noise = Some(noise.unwrap().set_octaves(octaves));
+    #[inline]
+    pub fn changed(&self) -> bool {
+        self.changed
     }
 
-    pub fn set_frequency(mut self, frequency: f64) {
-        let noise = std::mem::replace(&mut self.noise, None);
-        self.noise = Some(noise.unwrap().set_frequency(frequency));
+    #[inline]
+    pub fn set_changed(&mut self) {
+        self.changed = true;
     }
 
     #[inline]
@@ -78,11 +83,10 @@ impl Landscape {
     pub fn generate(&mut self) {
         let stride = self.width as usize;
         let y_center: f64 = f64::from(self.height) / 2.;
-        let noise = self.noise.as_mut().unwrap();
 
         for x in 0..self.width {
             let sx = f64::from(x + self.dx);
-            let value = noise.get([sx, 0.]) * self.amplitude;
+            let value = self.noise.get([sx, 0.]) * self.amplitude;
             let y = (y_center + value).round().max(0.) as usize;
             let y = y.min(self.height as usize);
             let index = y * stride + (x as usize);
@@ -123,17 +127,19 @@ impl Landscape {
         self.buffer[index] > 0
     }
 
-    pub fn rgba_buffer(&self) -> &[u8] {
-        &self.rgba_buffer
-    }
-
-    pub fn build_rgba(&mut self) -> &[u8] {
+    pub fn create_image(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult<graphics::Image> {
         let buf = unsafe { self.rgba_buffer.align_to_mut::<u32>().1 };
         for (&v, d) in self.buffer.iter().zip(buf) {
             *d = if v == 0 { 0 } else { 0xff_40_71_9c } // 0xff_cf_bd_00
         }
+        self.changed = false;
 
-        &self.rgba_buffer
+        graphics::Image::from_rgba8(
+            ctx,
+            self.width as u16,
+            self.height as u16,
+            &self.rgba_buffer,
+        )
     }
 
     pub fn subsidence(&mut self) {

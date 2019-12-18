@@ -15,7 +15,7 @@ impl Missile {
         let velocity: Vector2 = Vector2::new(rad.sin(), -rad.cos()) * power;
 
         Missile {
-            ballistics: Ballistics::new(pos, velocity, acceleration, TIME_SCALE),
+            ballistics: Ballistics::new(pos, velocity, acceleration).time_scale(TIME_SCALE),
         }
     }
 

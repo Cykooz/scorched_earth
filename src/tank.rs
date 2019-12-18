@@ -1,8 +1,8 @@
 use std::f32::consts::PI;
 
-use ggez::graphics::{Color, Rect};
+use ggez::{self, graphics, GameResult};
 
-use crate::{Ballistics, Landscape, Missile, Point2, Vector2, G};
+use crate::{Assets, Ballistics, Landscape, Missile, Point2, Vector2, G};
 
 const TANK_SIZE: f32 = 41.;
 const GUN_SIZE: f32 = 21.;
@@ -11,10 +11,11 @@ const TIME_SCALE: f32 = 3.0;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Tank {
-    pub rect: Rect,
-    pub color: Color,
+    pub rect: graphics::Rect,
+    pub color: graphics::Color,
     pub angle: f32,
     pub power: f32,
+    pub health: u8,
     throwing: Option<Ballistics>,
 }
 
@@ -32,17 +33,18 @@ impl TankState {
 }
 
 impl Tank {
-    pub fn new<P>(top_left: P, color: Color) -> Tank
+    pub fn new<P>(top_left: P, color: graphics::Color) -> Tank
     where
         P: Into<Point2>,
     {
         let top_left: Point2 = top_left.into();
-        let rect = Rect::new(top_left.x, top_left.y, TANK_SIZE, TANK_SIZE);
+        let rect = graphics::Rect::new(top_left.x, top_left.y, TANK_SIZE, TANK_SIZE);
         let mut tank = Tank {
             rect,
             color,
             angle: 0.0,
             power: 40.0,
+            health: 100,
             throwing: None,
         };
         tank.throw_down(None);
@@ -98,7 +100,7 @@ impl Tank {
                         if empty_count < tank_width as usize {
                             // Landscape under tank is not empty - clear it
                             pixels.iter_mut().for_each(|c| *c = 0);
-                            landscape.changed = true;
+                            landscape.set_changed();
                         }
                         // Get down tank
                         offset += 1.0;
@@ -126,12 +128,22 @@ impl Tank {
             self.rect.y = top;
         }
 
-        self.throwing = Some(Ballistics::new(
-            [self.rect.x, self.rect.bottom() - 1.],
-            [0., 0.],
-            [0., G],
-            TIME_SCALE,
-        ));
+        self.throwing = Some(
+            Ballistics::new([self.rect.x, self.rect.bottom() - 1.], [0., 0.], [0., G])
+                .time_scale(TIME_SCALE),
+        );
+    }
+
+    pub fn draw(&self, ctx: &mut ggez::Context, assets: &Assets) -> GameResult {
+        let pos = self.top_left();
+        let gun_params = graphics::DrawParam::new()
+            .dest(pos + Vector2::new(20.5, 20.5))
+            .offset(Point2::new(0.5, 0.5))
+            .rotation(std::f32::consts::PI * self.angle / 180.0);
+        graphics::draw(ctx, &assets.gun_image, gun_params)?;
+        let tank_params = graphics::DrawParam::new().dest(pos);
+        graphics::draw(ctx, &assets.tank_image, tank_params)?;
+        Ok(())
     }
 }
 

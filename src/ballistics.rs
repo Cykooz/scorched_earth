@@ -10,28 +10,40 @@ pub struct Ballistics {
     cur_pos: Point2,
     last_updated: f32,
     time_scale: f32,
+    rebound_efficiency: f32,
 }
 
 impl Ballistics {
-    pub fn new<P, V>(
-        start_pos: P,
-        start_velocity: V,
-        acceleration: V,
-        time_scale: f32,
-    ) -> Ballistics
+    pub fn new<P, V>(start_pos: P, start_velocity: V, acceleration: V) -> Ballistics
     where
         P: Into<Point2>,
         V: Into<Vector2>,
     {
         let start_pos = start_pos.into();
         Ballistics {
+            created: Instant::now(),
             start_pos,
             start_velocity: start_velocity.into(),
             acceleration: acceleration.into(),
             cur_pos: start_pos,
-            created: Instant::now(),
             last_updated: 0.0,
-            time_scale,
+            time_scale: 1.0,
+            rebound_efficiency: 1.0,
+        }
+    }
+
+    pub fn time_scale(self, value: f32) -> Self {
+        Self {
+            time_scale: value,
+            last_updated: 0.0,
+            ..self
+        }
+    }
+
+    pub fn rebound_efficiency(self, value: f32) -> Self {
+        Self {
+            rebound_efficiency: value,
+            ..self
         }
     }
 
@@ -69,7 +81,7 @@ impl Ballistics {
         }
 
         self.start_pos = pos;
-        self.start_velocity = velocity;
+        self.start_velocity = velocity * self.rebound_efficiency;
         self.cur_pos = pos;
         self.created = Instant::now();
         self.last_updated = 0.0;
@@ -181,7 +193,7 @@ mod tests {
         let pos = [0., 0.];
         let acceleration = [0.0, 0.0];
         let velocity = [100.0, 0.0];
-        let mut ballistics = Ballistics::new(pos, velocity, acceleration, TIME_SCALE);
+        let mut ballistics = Ballistics::new(pos, velocity, acceleration).time_scale(TIME_SCALE);
 
         //assert_eq!(ballistics.pos_i32(10.0), (3000, 0));
 
@@ -208,7 +220,7 @@ mod tests {
         let pos = [0., 0.];
         let acceleration = [0., 0.];
         let velocity = [0., -100.];
-        let mut ballistics = Ballistics::new(pos, velocity, acceleration, TIME_SCALE);
+        let mut ballistics = Ballistics::new(pos, velocity, acceleration).time_scale(TIME_SCALE);
 
         //assert_eq!(missile.pos(10.0 * TIME_SCALE).y, -3000.0);
 

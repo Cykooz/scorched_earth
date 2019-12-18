@@ -14,6 +14,7 @@ bytecount = "0.6.0"
 line_drawing = "0.8.0"
 itertools = "0.8.1"
 #mint = "0.5.3"
+gfx = "0.18.2"
 
 
 [dependencies.rand]

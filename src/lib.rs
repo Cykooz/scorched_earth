@@ -1,18 +1,20 @@
 pub use assets::Assets;
 pub use ballistics::Ballistics;
 pub use explosion::Explosion;
-pub use game_state::{GameState, Round};
+pub use geometry::Circle;
 pub use landscape::Landscape;
 pub use missile::Missile;
+pub use round::{GameState, Round};
 pub use tank::Tank;
 pub use types::*;
 
 mod assets;
 mod ballistics;
 mod explosion;
-mod game_state;
+mod geometry;
 mod landscape;
 mod missile;
+mod round;
 mod tank;
 mod types;
 

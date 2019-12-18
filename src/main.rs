@@ -1,8 +1,18 @@
+use gfx::{self, *};
 use ggez::conf::{WindowMode, WindowSetup};
 use ggez::input::keyboard::{KeyCode, KeyMods};
-use ggez::{event, graphics, GameError};
+use ggez::{event, graphics, timer, GameError};
 
-use scorched_earth::{Assets, GameState, Point2, Round, Vector2};
+use ggez::graphics::Canvas;
+use scorched_earth::{Assets, GameState, Point2, Round};
+
+// Define the input struct for our shader.
+gfx_defines! {
+    constant GlowParams {
+        glow_color: [f32; 3] = "glow_color",
+        glow_intensity: f32 = "glow_intensity",
+    }
+}
 
 struct MainState {
     game_round: Round,
@@ -11,22 +21,30 @@ struct MainState {
     borders_mesh: graphics::Mesh,
     missile_mesh: graphics::Mesh,
     explosion_mesh: graphics::Mesh,
+    glow_shader: graphics::Shader<GlowParams>,
+    glow_params: GlowParams,
+    glow_canvas: Canvas,
 }
 
 impl MainState {
     fn new(ctx: &mut ggez::Context) -> ggez::GameResult<MainState> {
         let (width, height) = screen_size(ctx);
-        let game_round =
-            Round::new(width - 2.0, height - 2.0).map_err(GameError::ResourceLoadError)?;
+        let width = width as u16;
+        let height = height as u16;
+        let game_round = Round::new(width - 2, height - 2).map_err(GameError::ResourceLoadError)?;
+        let glow_params = GlowParams {
+            glow_color: [1., 1., 1.],
+            glow_intensity: 1.0,
+        };
 
-        let mut state = MainState {
+        let state = MainState {
             game_round,
             landscape_image: None,
             assets: Assets::new(ctx)?,
             borders_mesh: graphics::Mesh::new_rectangle(
                 ctx,
                 graphics::DrawMode::stroke(1.0),
-                graphics::Rect::new(0.0, 0.0, width - 1.0, height - 1.0),
+                graphics::Rect::new(0.0, 0.0, width as f32 - 1.0, height as f32 - 1.0),
                 graphics::Color::from_rgb(255, 255, 255),
             )?,
             missile_mesh: graphics::Mesh::new_circle(
@@ -45,20 +63,25 @@ impl MainState {
                 0.5,
                 graphics::WHITE,
             )?,
+            glow_shader: graphics::Shader::new(
+                ctx,
+                "/shaders/basic_150.glslv",
+                "/shaders/glow.glslf",
+                glow_params,
+                "GlowParams",
+                None,
+            )?,
+            glow_params,
+            glow_canvas: Canvas::with_window_size(ctx)?,
         };
-        state.build_landscape_image(ctx)?;
 
         Ok(state)
     }
 
-    fn build_landscape_image(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
-        self.landscape_image = Some(graphics::Image::from_rgba8(
-            ctx,
-            self.game_round.width as u16,
-            self.game_round.height as u16,
-            self.game_round.landscape.build_rgba(),
-        )?);
-        self.game_round.landscape.changed = false;
+    fn update_landscape_image(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
+        if self.landscape_image.is_none() || self.game_round.landscape.changed() {
+            self.landscape_image = Some(self.game_round.landscape.create_image(ctx)?);
+        }
         Ok(())
     }
 }
@@ -66,11 +89,9 @@ impl MainState {
 impl event::EventHandler for MainState {
     fn update(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
         self.game_round.update(&mut self.assets);
-
-        if self.landscape_image.is_none() || self.game_round.landscape.changed {
-            self.build_landscape_image(ctx)?;
-        }
-
+        self.update_landscape_image(ctx)?;
+        self.glow_params.glow_intensity =
+            (0.5 + (((timer::ticks(ctx) as f32) / 20.0).cos() / 2.0)) * 0.8;
         Ok(())
     }
 
@@ -88,16 +109,23 @@ impl event::EventHandler for MainState {
                 graphics::draw(ctx, image, ([0.0, 0.0],))?;
             }
 
-            // Tanks
-            for tank in &self.game_round.tanks {
-                let pos = tank.top_left();
-                let gun_params = graphics::DrawParam::new()
-                    .dest(pos + Vector2::new(20.5, 20.5))
-                    .offset(Point2::new(0.5, 0.5))
-                    .rotation(std::f32::consts::PI * tank.angle / 180.0);
-                graphics::draw(ctx, &self.assets.gun_image, gun_params)?;
-                let tank_params = graphics::DrawParam::new().dest(pos);
-                graphics::draw(ctx, &self.assets.tank_image, tank_params)?;
+            // Current tank with glowing effect
+            graphics::set_canvas(ctx, Some(&self.glow_canvas));
+            graphics::clear(ctx, [0.0, 0.0, 0.0, 0.0].into());
+            let cur_tank = &self.game_round.tanks[self.game_round.current_tank];
+            cur_tank.draw(ctx, &self.assets)?;
+            graphics::set_canvas(ctx, None);
+            {
+                let _lock = graphics::use_shader(ctx, &self.glow_shader);
+                self.glow_shader.send(ctx, self.glow_params)?;
+                graphics::draw(ctx, &self.glow_canvas, ([-1.0, -1.0],))?;
+            }
+
+            // Other tanks
+            for (i, tank) in self.game_round.tanks.iter().enumerate() {
+                if i != self.game_round.current_tank {
+                    tank.draw(ctx, &self.assets)?;
+                }
             }
 
             // Missile
@@ -145,6 +173,11 @@ impl event::EventHandler for MainState {
         let player = self.game_round.current_tank + 1;
         let text = graphics::Text::new((format!("Player: {}", player), self.assets.font, 20.0));
         let dest_point = Point2::new(440.0, 10.0);
+        graphics::draw(ctx, &text, (dest_point,))?;
+
+        let health = self.game_round.health();
+        let text = graphics::Text::new((format!("Health: {}", health), self.assets.font, 20.0));
+        let dest_point = Point2::new(540.0, 10.0);
         graphics::draw(ctx, &text, (dest_point,))?;
 
         graphics::present(ctx)?;

@@ -5,6 +5,7 @@ use rand::rngs::ThreadRng;
 use rand::Rng;
 
 use crate::{Assets, Explosion, Landscape, Missile, Tank, Vector2, G};
+use std::mem::take;
 
 #[derive(Debug, Clone, Copy)]
 pub enum GameState {
@@ -27,22 +28,22 @@ pub struct Round {
 }
 
 impl Round {
-    pub fn new(width: f32, height: f32) -> Result<Round, String> {
+    pub fn new(width: u16, height: u16) -> Result<Round, String> {
         let mut rng = rand::thread_rng();
-        let mut landscape = Landscape::new(width as u16, height as u16)?;
+        let mut landscape = Landscape::new(width, height)?;
         landscape.set_seed(rng.gen());
         landscape.dx = rng.gen_range(0, width as i32 / 2);
         landscape.generate();
 
         let tanks = vec![
             Tank::new([100., 50.], Color::from_rgb(245, 71, 32)),
-            Tank::new([width - 100., 50.], Color::from_rgb(42, 219, 39)),
+            Tank::new([width as f32 - 100., 50.], Color::from_rgb(42, 219, 39)),
         ];
 
         let mut round = Round {
             rng,
-            width,
-            height,
+            width: width as f32,
+            height: height as f32,
             landscape,
             wind_power: 0.0,
             tanks,
@@ -62,9 +63,11 @@ impl Round {
     pub fn regenerate_landscape(&mut self) {
         self.landscape.generate();
         for tank in self.tanks.iter_mut() {
+            tank.health = 100;
             tank.throw_down(Some(50.));
         }
         self.change_wind();
+        self.state = GameState::TanksThrowing;
     }
 
     fn change_wind(&mut self) {
@@ -103,6 +106,12 @@ impl Round {
     fn update_explosion(&mut self) {
         if let GameState::Exploding(ref mut explosion) = self.state {
             if explosion.update(&mut self.landscape) {
+                // Check intersection of explosion with tanks and decrease its health.
+                for tank in self.tanks.iter_mut() {
+                    let percents = explosion.get_intersection_percents(tank.rect);
+                    tank.health = tank.health.saturating_sub(percents);
+                }
+
                 self.landscape.subsidence();
                 self.state = GameState::Subsidence;
             }
@@ -150,6 +159,13 @@ impl Round {
         self.tanks
             .get(self.current_tank)
             .map_or_else(|| 0.0, |tank| tank.power)
+    }
+
+    #[inline]
+    pub fn health(&self) -> u8 {
+        self.tanks
+            .get(self.current_tank)
+            .map_or_else(|| 0, |tank| tank.health)
     }
 
     #[inline]
