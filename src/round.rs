@@ -5,7 +5,6 @@ use rand::rngs::ThreadRng;
 use rand::Rng;
 
 use crate::{Assets, Explosion, Landscape, Missile, Tank, Vector2, G};
-use std::mem::take;
 
 #[derive(Debug, Clone, Copy)]
 pub enum GameState {
