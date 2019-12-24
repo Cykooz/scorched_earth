@@ -18,4 +18,4 @@ mod round;
 mod tank;
 mod types;
 
-pub const G: f32 = 9.8;
+pub const G: f32 = 9.80665;

@@ -1,6 +1,9 @@
-use crate::{Point2, Vector2};
+use std::cmp::Ordering;
+
 use cgmath::prelude::*;
 use ggez::graphics::Rect;
+
+use crate::{Point2, Vector2};
 
 pub struct Circle {
     pub center: Point2,
@@ -33,33 +36,37 @@ impl Circle {
         let d = point1.perp_dot(point2);
         let discriminant = self.radius * self.radius * dr2 - d * d;
 
-        if discriminant > 0.0 {
-            // Two intersections
-            let discr_sqrt = discriminant.sqrt();
-            let mut result = Vec::with_capacity(2);
+        match discriminant.partial_cmp(&0.0) {
+            Some(Ordering::Greater) => {
+                // Two intersections
+                let discr_sqrt = discriminant.sqrt();
+                let mut result = Vec::with_capacity(2);
 
-            let dx = -d * line_vector.x;
-            let dy = d * line_vector.y;
-            let x_discr = line_vector.y.signum() * line_vector.x * discr_sqrt;
-            let y_dyscr = line_vector.y.abs() * discr_sqrt;
+                let dx = -d * line_vector.x;
+                let dy = d * line_vector.y;
+                let x_discr = line_vector.y.signum() * line_vector.x * discr_sqrt;
+                let y_dyscr = line_vector.y.abs() * discr_sqrt;
 
-            let x = (dy - x_discr) / dr2 + self.center.x;
-            let y = (dx - y_dyscr) / dr2 + self.center.y;
-            result.push(Point2::new(x, y));
+                let x = (dy - x_discr) / dr2 + self.center.x;
+                let y = (dx - y_dyscr) / dr2 + self.center.y;
+                result.push(Point2::new(x, y));
 
-            let x = (dy + x_discr) / dr2 + self.center.x;
-            let y = (dx + y_dyscr) / dr2 + self.center.y;
-            result.push(Point2::new(x, y));
+                let x = (dy + x_discr) / dr2 + self.center.x;
+                let y = (dx + y_dyscr) / dr2 + self.center.y;
+                result.push(Point2::new(x, y));
 
-            result
-        } else if discriminant == 0.0 {
-            // One intersection (tangent)
-            let x = d * line_vector.y / dr2 + self.center.x;
-            let y = -d * line_vector.x / dr2 + self.center.y;
-            vec![Point2::new(x, y)]
-        } else {
-            // No intersections
-            vec![]
+                result
+            }
+            Some(Ordering::Equal) => {
+                // One intersection (tangent)
+                let x = d * line_vector.y / dr2 + self.center.x;
+                let y = -d * line_vector.x / dr2 + self.center.y;
+                vec![Point2::new(x, y)]
+            }
+            _ => {
+                // No intersections
+                vec![]
+            }
         }
     }
 
@@ -162,8 +169,9 @@ impl Circle {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI};
+
+    use super::*;
 
     #[test]
     fn test_circle_line_no_intersections() {
