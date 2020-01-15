@@ -2,7 +2,12 @@ use std::f32::consts::PI;
 
 use ggez::{self, graphics, GameResult};
 
-use crate::{Assets, Ballistics, Landscape, Missile, Point2, Vector2, G};
+use crate::ballistics::Ballistics;
+use crate::landscape::Landscape;
+use crate::missile::Missile;
+use crate::types::{Point2, Vector2};
+use crate::world::World;
+use crate::G;
 
 const TANK_SIZE: f32 = 41.;
 const GUN_SIZE: f32 = 21.;
@@ -134,15 +139,15 @@ impl Tank {
         );
     }
 
-    pub fn draw(&self, ctx: &mut ggez::Context, assets: &Assets) -> GameResult {
+    pub fn draw(&self, ctx: &mut ggez::Context, world: &World) -> GameResult {
         let pos = self.top_left();
         let gun_params = graphics::DrawParam::new()
             .dest(pos + Vector2::new(20.5, 20.5))
             .offset(Point2::new(0.5, 0.5))
             .rotation(std::f32::consts::PI * self.angle / 180.0);
-        graphics::draw(ctx, &assets.gun_image, gun_params)?;
+        graphics::draw(ctx, &world.gun_image, gun_params)?;
         let tank_params = graphics::DrawParam::new().dest(pos);
-        graphics::draw(ctx, &assets.tank_image, tank_params)?;
+        graphics::draw(ctx, &world.tank_image, tank_params)?;
         Ok(())
     }
 }

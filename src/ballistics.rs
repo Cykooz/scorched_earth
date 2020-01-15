@@ -1,4 +1,4 @@
-use crate::{Point2, Vector2};
+use crate::types::{Point2, Vector2};
 use std::time::Instant;
 
 #[derive(Debug, Clone, Copy)]

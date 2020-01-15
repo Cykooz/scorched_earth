@@ -3,7 +3,9 @@ use std::time::Instant;
 use ggez::graphics::Rect;
 use itertools::Itertools;
 
-use crate::{Circle, Landscape, Point2};
+use crate::geometry::Circle;
+use crate::landscape::Landscape;
+use crate::types::Point2;
 
 const SPEED: f32 = 150.0;
 

@@ -10,11 +10,10 @@ edition = "2018"
 [dependencies]
 noise = "0.6.0"
 ggez = "0.5.1"
-nalgebra = "0.18.1"
+ggez-goodies = "0.5.0"
 bytecount = "0.6.0"
 line_drawing = "0.8.0"
 itertools = "0.8.1"
-#mint = "0.5.3"
 gfx = "0.18.2"
 
 

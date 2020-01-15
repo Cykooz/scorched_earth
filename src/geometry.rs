@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use cgmath::prelude::*;
 use ggez::graphics::Rect;
 
-use crate::{Point2, Vector2};
+use crate::types::{Point2, Vector2};
 
 pub struct Circle {
     pub center: Point2,

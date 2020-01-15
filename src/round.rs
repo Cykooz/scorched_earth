@@ -4,7 +4,13 @@ use ggez::graphics::Color;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
-use crate::{Assets, Explosion, Landscape, Missile, Tank, Vector2, G};
+use crate::explosion::Explosion;
+use crate::landscape::Landscape;
+use crate::missile::Missile;
+use crate::tank::Tank;
+use crate::types::Vector2;
+use crate::world::World;
+use crate::G;
 
 #[derive(Debug, Clone, Copy)]
 pub enum GameState {
@@ -73,9 +79,9 @@ impl Round {
         self.wind_power = (self.rng.gen_range(-10.0_f32, 10.0_f32) * 10.0).round() / 10.0;
     }
 
-    pub fn update(&mut self, assets: &mut Assets) {
+    pub fn update(&mut self, world: &mut World) {
         self.update_tanks();
-        self.update_missile(assets);
+        self.update_missile(world);
         self.update_explosion();
         self.update_landscape();
     }
@@ -93,10 +99,10 @@ impl Round {
         }
     }
 
-    fn update_missile(&mut self, assets: &mut Assets) {
+    fn update_missile(&mut self, world: &mut World) {
         if let GameState::FlyingOfMissile(ref mut missile) = self.state {
             if let Some(pos) = missile.update(&self.landscape) {
-                assets.explosion_sound.play().unwrap();
+                world.explosion_sound.play().unwrap();
                 self.state = GameState::Exploding(Explosion::new(pos, 50.0));
             }
         }
@@ -189,10 +195,10 @@ impl Round {
         }
     }
 
-    pub fn shoot(&mut self, assets: &mut Assets) {
+    pub fn shoot(&mut self, world: &mut World) {
         if let GameState::Aiming = self.state {
             if let Some(tank) = self.tanks.get(self.current_tank) {
-                assets.tank_fire_sound.play().unwrap();
+                world.tank_fire_sound.play().unwrap();
                 let acceleration = Vector2::new(self.wind_power, G);
                 self.state = GameState::FlyingOfMissile(tank.shoot(acceleration));
             }

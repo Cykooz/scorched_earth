@@ -1,6 +1,8 @@
 use std::f32::consts::PI;
 
-use crate::{Ballistics, Landscape, Point2, Vector2};
+use crate::ballistics::Ballistics;
+use crate::landscape::Landscape;
+use crate::types::{Point2, Vector2};
 
 const TIME_SCALE: f32 = 3.0;
 
