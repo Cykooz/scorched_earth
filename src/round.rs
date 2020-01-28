@@ -1,7 +1,7 @@
-use cgmath::InnerSpace;
 use ggez::audio::SoundSource;
 use ggez::graphics::Color;
 use rand::rngs::ThreadRng;
+use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::explosion::Explosion;
@@ -33,17 +33,26 @@ pub struct Round {
 }
 
 impl Round {
-    pub fn new(width: u16, height: u16) -> Result<Round, String> {
+    pub fn new(width: u16, height: u16, count_of_tanks: u8) -> Result<Round, String> {
         let mut rng = rand::thread_rng();
         let mut landscape = Landscape::new(width, height)?;
         landscape.set_seed(rng.gen());
         landscape.dx = rng.gen_range(0, width as i32 / 2);
         landscape.generate();
 
-        let tanks = vec![
-            Tank::new([100., 50.], Color::from_rgb(245, 71, 32)),
-            Tank::new([width as f32 - 100., 50.], Color::from_rgb(42, 219, 39)),
-        ];
+        let size_between_tanks = (width as f32 - 200.) / (count_of_tanks - 1) as f32;
+
+        let mut player_numbers: Vec<u8> = (1..=count_of_tanks).collect();
+        player_numbers.shuffle(&mut rng);
+
+        let tanks: Vec<Tank> = player_numbers
+            .iter()
+            .enumerate()
+            .map(|(i, &player_number)| {
+                let x = 100. + size_between_tanks * i as f32;
+                Tank::new(player_number, [x, 50.], Color::from_rgb(245, 71, 32))
+            })
+            .collect();
 
         let mut round = Round {
             rng,
@@ -59,21 +68,21 @@ impl Round {
         Ok(round)
     }
 
-    #[inline]
-    pub fn update_landscape_seed(&mut self) {
-        self.landscape.set_seed(self.rng.gen());
-    }
-
-    #[inline]
-    pub fn regenerate_landscape(&mut self) {
-        self.landscape.generate();
-        for tank in self.tanks.iter_mut() {
-            tank.health = 100;
-            tank.throw_down(Some(50.));
-        }
-        self.change_wind();
-        self.state = GameState::TanksThrowing;
-    }
+    //    #[inline]
+    //    pub fn update_landscape_seed(&mut self) {
+    //        self.landscape.set_seed(self.rng.gen());
+    //    }
+    //
+    //    #[inline]
+    //    pub fn regenerate_landscape(&mut self) {
+    //        self.landscape.generate();
+    //        for tank in self.tanks.iter_mut() {
+    //            tank.health = 100;
+    //            tank.throw_down(Some(50.));
+    //        }
+    //        self.change_wind();
+    //        self.state = GameState::TanksThrowing;
+    //    }
 
     fn change_wind(&mut self) {
         self.wind_power = (self.rng.gen_range(-10.0_f32, 10.0_f32) * 10.0).round() / 10.0;
@@ -153,6 +162,13 @@ impl Round {
     }
 
     #[inline]
+    pub fn player_number(&self) -> u8 {
+        self.tanks
+            .get(self.current_tank)
+            .map_or_else(|| 1, |tank| tank.player_number)
+    }
+
+    #[inline]
     pub fn gun_angle(&self) -> f32 {
         self.tanks
             .get(self.current_tank)
@@ -173,14 +189,14 @@ impl Round {
             .map_or_else(|| 0, |tank| tank.health)
     }
 
-    #[inline]
-    pub fn missile_speed(&self) -> f32 {
-        if let GameState::FlyingOfMissile(ref missile) = self.state {
-            let velocity = missile.cur_velocity();
-            return velocity.magnitude();
-        }
-        0.0
-    }
+    //    #[inline]
+    //    pub fn missile_speed(&self) -> f32 {
+    //        if let GameState::FlyingOfMissile(ref missile) = self.state {
+    //            let velocity = missile.cur_velocity();
+    //            return velocity.magnitude();
+    //        }
+    //        0.0
+    //    }
 
     /// Increment power of gun of current tank
     pub fn inc_gun_power(&mut self, delta: f32) {

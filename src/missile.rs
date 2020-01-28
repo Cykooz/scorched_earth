@@ -26,10 +26,10 @@ impl Missile {
         self.ballistics.cur_pos()
     }
 
-    #[inline]
-    pub fn cur_velocity(&self) -> Vector2 {
-        self.ballistics.pos_and_velocity().1
-    }
+    //    #[inline]
+    //    pub fn cur_velocity(&self) -> Vector2 {
+    //        self.ballistics.pos_and_velocity().1
+    //    }
 
     pub fn update(&mut self, landscape: &Landscape) -> Option<Point2> {
         let size = landscape.size();

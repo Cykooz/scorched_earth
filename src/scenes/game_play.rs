@@ -16,9 +16,13 @@ pub struct GamePlayScene {
 }
 
 impl GamePlayScene {
-    pub fn new(ctx: &mut ggez::Context, _world: &mut World) -> ggez::GameResult<Self> {
+    pub fn new(
+        count_of_players: u8,
+        ctx: &mut ggez::Context,
+        _world: &mut World,
+    ) -> ggez::GameResult<Self> {
         let (width, height) = utils::screen_size(ctx);
-        let game_round = Round::new(width as u16 - 2, height as u16 - 2)
+        let game_round = Round::new(width as u16 - 2, height as u16 - 2, count_of_players)
             .map_err(GameError::ResourceLoadError)?;
 
         let state = Self {
@@ -118,33 +122,35 @@ impl scene::Scene<World, input::Event> for GamePlayScene {
         graphics::draw(ctx, &world.borders_mesh, (Point2::new(1.0, 0.0),))?;
 
         // Status line
-        let angle = self.game_round.gun_angle();
-        let text = graphics::Text::new((format!("Angle: {}", angle), world.font, 20.0));
-        let dest_point = Point2::new(10.0, 10.0);
-        graphics::draw(ctx, &text, (dest_point,))?;
+        {
+            let angle = self.game_round.gun_angle();
+            let text = graphics::Text::new((format!("Angle: {}", angle), world.font, 20.0));
+            let dest_point = Point2::new(10.0, 10.0);
+            graphics::draw(ctx, &text, (dest_point,))?;
 
-        let power = self.game_round.gun_power();
-        let text = graphics::Text::new((format!("Power: {}", power), world.font, 20.0));
-        let dest_point = Point2::new(110.0, 10.0);
-        graphics::draw(ctx, &text, (dest_point,))?;
+            let power = self.game_round.gun_power();
+            let text = graphics::Text::new((format!("Power: {}", power), world.font, 20.0));
+            let dest_point = Point2::new(110.0, 10.0);
+            graphics::draw(ctx, &text, (dest_point,))?;
 
-        let text = graphics::Text::new((
-            format!("Wind: {}", self.game_round.wind_power * 10.0),
-            world.font,
-            20.0,
-        ));
-        let dest_point = Point2::new(220.0, 10.0);
-        graphics::draw(ctx, &text, (dest_point,))?;
+            let text = graphics::Text::new((
+                format!("Wind: {}", self.game_round.wind_power * 10.0),
+                world.font,
+                20.0,
+            ));
+            let dest_point = Point2::new(220.0, 10.0);
+            graphics::draw(ctx, &text, (dest_point,))?;
 
-        let player = self.game_round.current_tank + 1;
-        let text = graphics::Text::new((format!("Player: {}", player), world.font, 20.0));
-        let dest_point = Point2::new(440.0, 10.0);
-        graphics::draw(ctx, &text, (dest_point,))?;
+            let player = self.game_round.player_number();
+            let text = graphics::Text::new((format!("Player: {}", player), world.font, 20.0));
+            let dest_point = Point2::new(440.0, 10.0);
+            graphics::draw(ctx, &text, (dest_point,))?;
 
-        let health = self.game_round.health();
-        let text = graphics::Text::new((format!("Health: {}", health), world.font, 20.0));
-        let dest_point = Point2::new(540.0, 10.0);
-        graphics::draw(ctx, &text, (dest_point,))?;
+            let health = self.game_round.health();
+            let text = graphics::Text::new((format!("Health: {}", health), world.font, 20.0));
+            let dest_point = Point2::new(540.0, 10.0);
+            graphics::draw(ctx, &text, (dest_point,))?;
+        }
 
         //        graphics::present(ctx)?;
         Ok(())

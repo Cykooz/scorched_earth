@@ -16,6 +16,7 @@ const TIME_SCALE: f32 = 3.0;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Tank {
+    pub player_number: u8,
     pub rect: graphics::Rect,
     pub color: graphics::Color,
     pub angle: f32,
@@ -38,13 +39,14 @@ impl TankState {
 }
 
 impl Tank {
-    pub fn new<P>(top_left: P, color: graphics::Color) -> Tank
+    pub fn new<P>(player_number: u8, top_left: P, color: graphics::Color) -> Tank
     where
         P: Into<Point2>,
     {
         let top_left: Point2 = top_left.into();
         let rect = graphics::Rect::new(top_left.x, top_left.y, TANK_SIZE, TANK_SIZE);
         let mut tank = Tank {
+            player_number,
             rect,
             color,
             angle: 0.0,
@@ -56,10 +58,10 @@ impl Tank {
         tank
     }
 
-    #[inline]
-    pub fn bottom_left(&self) -> Point2 {
-        [self.rect.x, self.rect.bottom() - 1.].into()
-    }
+    //    #[inline]
+    //    pub fn bottom_left(&self) -> Point2 {
+    //        [self.rect.x, self.rect.bottom() - 1.].into()
+    //    }
 
     #[inline]
     pub fn top_left(&self) -> Point2 {

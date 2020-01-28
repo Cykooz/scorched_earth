@@ -45,10 +45,8 @@ impl scene::Scene<World, input::Event> for MainMenuScene {
         if world.input.get_button_pressed(input::Button::Select) {
             match MENU_ITEMS[self.current_item].0 {
                 MenuItem::Play => {
-                    let game_play_scene = Box::new(
-                        scenes::game_play::GamePlayScene::new(ctx, world)
-                            .expect("Can't create GamePlayScene"),
-                    );
+                    let game_play_scene =
+                        Box::new(scenes::SelectCountOfPlayersScene::new(ctx, world));
                     scene::SceneSwitch::Push(game_play_scene)
                 }
                 MenuItem::Quit => {
@@ -62,7 +60,7 @@ impl scene::Scene<World, input::Event> for MainMenuScene {
     }
 
     fn draw(&mut self, world: &mut World, ctx: &mut ggez::Context) -> ggez::GameResult<()> {
-        graphics::clear(ctx, graphics::Color::from((0.0, 0.2, 0.4, 0.0)));
+        graphics::clear(ctx, [0.0, 0.2, 0.4, 1.0].into());
 
         for (index, &(_, item_text)) in MENU_ITEMS.iter().enumerate() {
             let text_color = if index == self.current_item {

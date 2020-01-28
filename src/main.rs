@@ -12,7 +12,7 @@ impl MainState {
     fn new(ctx: &mut ggez::Context) -> ggez::GameResult<MainState> {
         let world = world::World::new(ctx)?;
         let mut scene_stack = scenes::Stack::new(ctx, world);
-        let main_menu_scene = scenes::main_menu::MainMenuScene::new(ctx, &mut scene_stack.world);
+        let main_menu_scene = scenes::MainMenuScene::new(ctx, &mut scene_stack.world);
         scene_stack.push(Box::new(main_menu_scene));
 
         Ok(Self {
