@@ -6,16 +6,16 @@ use ggez_goodies::scene;
 
 use crate::types::Point2;
 use crate::world::World;
-use crate::{input, scenes, utils};
+use crate::{input, scenes, utils, MAX_PLAYERS_COUNT};
 
 pub struct SelectCountOfPlayersScene {
     count_of_players: u8,
 }
 
 impl SelectCountOfPlayersScene {
-    pub fn new(_ctx: &mut ggez::Context, _world: &mut World) -> Self {
+    pub fn new(_ctx: &mut ggez::Context, world: &mut World) -> Self {
         Self {
-            count_of_players: 2,
+            count_of_players: world.players_count(),
         }
     }
 }
@@ -27,9 +27,10 @@ impl scene::Scene<World, input::Event> for SelectCountOfPlayersScene {
         }
 
         if world.input.get_button_pressed(input::Button::Select) {
+            world.create_players_count(self.count_of_players);
+
             let game_play_scene = Box::new(
-                scenes::GamePlayScene::new(self.count_of_players, ctx, world)
-                    .expect("Can't create GamePlayScene"),
+                scenes::GamePlayScene::new(ctx, world).expect("Can't create GamePlayScene"),
             );
             return scene::SceneSwitch::Replace(game_play_scene);
         }
@@ -70,7 +71,9 @@ impl scene::Scene<World, input::Event> for SelectCountOfPlayersScene {
                     input::Button::Down => {
                         self.count_of_players = max(self.count_of_players - 1, 2)
                     }
-                    input::Button::Up => self.count_of_players = min(self.count_of_players + 1, 8),
+                    input::Button::Up => {
+                        self.count_of_players = min(self.count_of_players + 1, MAX_PLAYERS_COUNT)
+                    }
                     _ => (),
                 }
             }

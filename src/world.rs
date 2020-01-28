@@ -1,8 +1,10 @@
 use ggez;
 use ggez::{audio, graphics};
 
+use crate::player::Player;
 use crate::types::Point2;
-use crate::{input, shaders, utils};
+use crate::{input, shaders, utils, MAX_PLAYERS_COUNT};
+use std::cmp::{max, min};
 
 pub struct World {
     pub input: input::State,
@@ -15,13 +17,14 @@ pub struct World {
     pub missile_mesh: graphics::Mesh,
     pub explosion_mesh: graphics::Mesh,
     pub glow_shader: shaders::GlowShader,
+    pub players: Vec<Player>,
 }
 
 impl World {
     pub fn new(ctx: &mut ggez::Context) -> ggez::GameResult<Self> {
         let (width, height) = utils::screen_size(ctx);
 
-        let world = Self {
+        let mut world = Self {
             input: input::State::new(),
             tank_image: graphics::Image::new(ctx, "/sprites/tank.png")?,
             gun_image: graphics::Image::new(ctx, "/sprites/gun.png")?,
@@ -51,8 +54,22 @@ impl World {
                 graphics::WHITE,
             )?,
             glow_shader: shaders::load_glow_shader(ctx)?,
+            players: Vec::with_capacity(MAX_PLAYERS_COUNT as usize),
         };
+        world.create_players_count(2);
 
         Ok(world)
+    }
+
+    pub fn create_players_count(&mut self, count: u8) {
+        let count = min(max(count, 2), MAX_PLAYERS_COUNT);
+        self.players.clear();
+        for _ in 0..count {
+            self.players.push(Player { money: 0 });
+        }
+    }
+
+    pub fn players_count(&self) -> u8 {
+        self.players.len() as u8
     }
 }

@@ -13,12 +13,19 @@ use crate::world::World;
 use crate::G;
 
 #[derive(Debug, Clone, Copy)]
+pub enum ThrowingNumber {
+    First,
+    NotFirst,
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum GameState {
-    TanksThrowing,
+    TanksThrowing(ThrowingNumber),
     Aiming,
     FlyingOfMissile(Missile),
     Exploding(Explosion),
     Subsidence,
+    Finish,
 }
 
 pub struct Round {
@@ -62,7 +69,7 @@ impl Round {
             wind_power: 0.0,
             tanks,
             current_tank: 0,
-            state: GameState::TanksThrowing,
+            state: GameState::TanksThrowing(ThrowingNumber::First),
         };
         round.change_wind();
         Ok(round)
@@ -88,22 +95,58 @@ impl Round {
         self.wind_power = (self.rng.gen_range(-10.0_f32, 10.0_f32) * 10.0).round() / 10.0;
     }
 
-    pub fn update(&mut self, world: &mut World) {
-        self.update_tanks();
+    pub fn update(&mut self, world: &mut World) -> GameState {
+        self.update_tanks(world);
         self.update_missile(world);
         self.update_explosion();
         self.update_landscape();
+        self.state
     }
 
-    fn update_tanks(&mut self) {
-        if let GameState::TanksThrowing = self.state {
+    fn update_tanks(&mut self, world: &mut World) {
+        if let GameState::TanksThrowing(number) = self.state {
             let mut all_placed = true;
             for tank in self.tanks.iter_mut() {
                 all_placed &= tank.update(&mut self.landscape).is_placed();
             }
 
             if all_placed {
-                self.state = GameState::Aiming;
+                if let ThrowingNumber::NotFirst = number {
+                    let current_player_number = self.player_number();
+
+                    // Remove all destroyed tanks and add some money to current player.
+                    let mut count_of_destroyed: u32 = 0;
+                    let mut i = 0;
+                    while i != self.tanks.len() {
+                        if self.tanks[i].health == 0 {
+                            self.tanks.remove(i);
+                            if i <= self.current_tank {
+                                self.current_tank = self.current_tank.saturating_sub(1);
+                            }
+                            count_of_destroyed += 1;
+                        } else {
+                            i += 1;
+                        }
+                    }
+
+                    let player = &mut world.players[current_player_number as usize - 1];
+                    player.money = player.money.saturating_add(200 * count_of_destroyed);
+
+                    if self.tanks.len() > 1 {
+                        if self.player_number() == current_player_number {
+                            self.current_tank += 1;
+                        }
+                        if self.current_tank >= self.tanks.len() {
+                            self.current_tank = 0;
+                        }
+                    }
+                }
+
+                self.state = if self.tanks.len() > 1 {
+                    GameState::Aiming
+                } else {
+                    GameState::Finish
+                };
             }
         }
     }
@@ -135,15 +178,11 @@ impl Round {
     fn update_landscape(&mut self) {
         if let GameState::Subsidence = self.state {
             if self.landscape.update() {
-                self.current_tank += 1;
-                if self.current_tank >= self.tanks.len() {
-                    self.current_tank = 0;
-                }
                 for tank in self.tanks.iter_mut() {
                     tank.throw_down(None);
                 }
                 self.change_wind();
-                self.state = GameState::TanksThrowing;
+                self.state = GameState::TanksThrowing(ThrowingNumber::NotFirst);
             }
         }
     }

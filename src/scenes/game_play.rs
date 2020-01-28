@@ -16,13 +16,9 @@ pub struct GamePlayScene {
 }
 
 impl GamePlayScene {
-    pub fn new(
-        count_of_players: u8,
-        ctx: &mut ggez::Context,
-        _world: &mut World,
-    ) -> ggez::GameResult<Self> {
+    pub fn new(ctx: &mut ggez::Context, world: &mut World) -> ggez::GameResult<Self> {
         let (width, height) = utils::screen_size(ctx);
-        let game_round = Round::new(width as u16 - 2, height as u16 - 2, count_of_players)
+        let game_round = Round::new(width as u16 - 2, height as u16 - 2, world.players_count())
             .map_err(GameError::ResourceLoadError)?;
 
         let state = Self {
@@ -56,7 +52,10 @@ impl scene::Scene<World, input::Event> for GamePlayScene {
             self.game_round.shoot(world)
         }
 
-        self.game_round.update(world);
+        if let GameState::Finish = self.game_round.update(world) {
+            return scene::SceneSwitch::Pop;
+        }
+
         self.update_landscape_image(ctx)
             .expect("Can't update landscape image");
         self.glow_params.glow_intensity =
