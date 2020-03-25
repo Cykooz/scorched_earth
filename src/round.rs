@@ -95,6 +95,46 @@ impl Round {
         self.wind_power = (self.rng.gen_range(-10.0_f32, 10.0_f32) * 10.0).round() / 10.0;
     }
 
+    /// Mark all destroyed tanks as "dead" and add some money to current player.
+    fn remove_destroyed_tanks(&mut self, world: &mut World) {
+        let current_player_number = self.player_number();
+        let mut count_of_destroyed: u32 = 0;
+        self.tanks
+            .iter_mut()
+            .filter(|t| t.health == 0 && !t.dead)
+            .for_each(|t| {
+                t.dead = true;
+                count_of_destroyed += 1;
+            });
+
+        let player = &mut world.players[current_player_number as usize - 1];
+        player.money = player.money.saturating_add(200 * count_of_destroyed);
+    }
+
+    fn switch_current_tank(&mut self) {
+        let mut current_tank = self.current_tank;
+        for _ in 0..self.tanks.len() {
+            current_tank += 1;
+            if current_tank >= self.tanks.len() {
+                current_tank = 0;
+            }
+            if !self.tanks[current_tank].dead {
+                self.current_tank = current_tank;
+                return;
+            }
+        }
+    }
+
+    #[inline]
+    pub fn live_tanks(&self) -> impl Iterator<Item = &Tank> {
+        self.tanks.iter().filter(|t| !t.dead)
+    }
+
+    #[inline]
+    pub fn live_tanks_count(&self) -> usize {
+        self.live_tanks().count()
+    }
+
     pub fn update(&mut self, world: &mut World) -> GameState {
         self.update_tanks(world);
         self.update_missile(world);
@@ -106,43 +146,18 @@ impl Round {
     fn update_tanks(&mut self, world: &mut World) {
         if let GameState::TanksThrowing(number) = self.state {
             let mut all_placed = true;
-            for tank in self.tanks.iter_mut() {
+            let live_tanks = self.tanks.iter_mut().filter(|t| !t.dead);
+            for tank in live_tanks {
                 all_placed &= tank.update(&mut self.landscape).is_placed();
             }
 
             if all_placed {
                 if let ThrowingNumber::NotFirst = number {
-                    let current_player_number = self.player_number();
-
-                    // Remove all destroyed tanks and add some money to current player.
-                    let mut count_of_destroyed: u32 = 0;
-                    let mut i = 0;
-                    while i != self.tanks.len() {
-                        if self.tanks[i].health == 0 {
-                            self.tanks.remove(i);
-                            if i <= self.current_tank {
-                                self.current_tank = self.current_tank.saturating_sub(1);
-                            }
-                            count_of_destroyed += 1;
-                        } else {
-                            i += 1;
-                        }
-                    }
-
-                    let player = &mut world.players[current_player_number as usize - 1];
-                    player.money = player.money.saturating_add(200 * count_of_destroyed);
-
-                    if self.tanks.len() > 1 {
-                        if self.player_number() == current_player_number {
-                            self.current_tank += 1;
-                        }
-                        if self.current_tank >= self.tanks.len() {
-                            self.current_tank = 0;
-                        }
-                    }
+                    self.remove_destroyed_tanks(world);
+                    self.switch_current_tank();
                 }
 
-                self.state = if self.tanks.len() > 1 {
+                self.state = if self.live_tanks_count() > 1 {
                     GameState::Aiming
                 } else {
                     GameState::Finish
@@ -164,7 +179,8 @@ impl Round {
         if let GameState::Exploding(ref mut explosion) = self.state {
             if explosion.update(&mut self.landscape) {
                 // Check intersection of explosion with tanks and decrease its health.
-                for tank in self.tanks.iter_mut() {
+                let live_tanks = self.tanks.iter_mut().filter(|t| !t.dead);
+                for tank in live_tanks {
                     let percents = explosion.get_intersection_percents(tank.rect);
                     tank.health = tank.health.saturating_sub(percents);
                 }
@@ -178,7 +194,8 @@ impl Round {
     fn update_landscape(&mut self) {
         if let GameState::Subsidence = self.state {
             if self.landscape.update() {
-                for tank in self.tanks.iter_mut() {
+                let live_tanks = self.tanks.iter_mut().filter(|t| !t.dead);
+                for tank in live_tanks {
                     tank.throw_down(None);
                 }
                 self.change_wind();

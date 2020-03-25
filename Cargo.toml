@@ -1,6 +1,6 @@
 [package]
-name = "scorched_earth"
-description = "A game inspired by \"Scorched Earth\" and \"Tank War\" (ZX-Spectrum)"
+name = "tank_war"
+description = "A game inspired by \"Tank War\" (ZX-Spectrum)"
 version = "0.1.0"
 authors = ["Kirill Kuzminykh <cykooz@gmail.com>"]
 edition = "2018"

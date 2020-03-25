@@ -1,7 +1,7 @@
 use ggez::conf::{WindowMode, WindowSetup};
 use ggez::{event, graphics, timer};
 
-use scorched_earth::{input, scenes, world};
+use tank_war::{input, scenes, world};
 
 struct MainState {
     scenes: scenes::Stack,
@@ -79,12 +79,12 @@ pub fn main() -> ggez::GameResult {
 
     let mut win_setup: WindowSetup = Default::default();
     win_setup = win_setup
-        .title("Scorched Earth - Rust edition")
+        .title("Tank War - Rust edition")
         .icon("/sprites/app_icon.png");
     let mut win_mode: WindowMode = Default::default();
     win_mode = win_mode.dimensions(1024., 768.);
 
-    let cb = ggez::ContextBuilder::new("scorched_rust", "cykooz")
+    let cb = ggez::ContextBuilder::new("tank_war", "cykooz")
         .window_setup(win_setup)
         .window_mode(win_mode)
         .add_resource_path(resource_dir);

@@ -92,7 +92,7 @@ impl scene::Scene<World, input::Event> for GamePlayScene {
 
             // Other tanks
             for (i, tank) in self.game_round.tanks.iter().enumerate() {
-                if i != self.game_round.current_tank {
+                if !tank.dead && i != self.game_round.current_tank {
                     tank.draw(ctx, world)?;
                 }
             }

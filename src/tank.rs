@@ -22,6 +22,7 @@ pub struct Tank {
     pub angle: f32,
     pub power: f32,
     pub health: u8,
+    pub dead: bool,
     throwing: Option<Ballistics>,
 }
 
@@ -52,6 +53,7 @@ impl Tank {
             angle: 0.0,
             power: 40.0,
             health: 100,
+            dead: false,
             throwing: None,
         };
         tank.throw_down(None);
@@ -160,7 +162,7 @@ mod tests {
 
     #[test]
     fn test_bottom_left() {
-        let tank = Tank::new([0., 0.], (0, 0, 0).into());
+        let tank = Tank::new(1, [0., 0.], (0, 0, 0).into());
         assert_eq!(tank.bottom_left(), [0., TANK_SIZE - 1.].into());
     }
 }
