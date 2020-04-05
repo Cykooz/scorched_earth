@@ -79,15 +79,17 @@ impl scene::Scene<World, input::Event> for GamePlayScene {
             }
 
             // Current tank with glowing effect
-            graphics::set_canvas(ctx, Some(&self.glow_canvas));
-            graphics::clear(ctx, [0.0, 0.0, 0.0, 0.0].into());
             let cur_tank = &self.game_round.tanks[self.game_round.current_tank];
-            cur_tank.draw(ctx, world)?;
-            graphics::set_canvas(ctx, None);
-            {
-                let _lock = graphics::use_shader(ctx, &world.glow_shader);
-                world.glow_shader.send(ctx, self.glow_params)?;
-                graphics::draw(ctx, &self.glow_canvas, ([-1.0, -1.0],))?;
+            if !cur_tank.dead {
+                graphics::set_canvas(ctx, Some(&self.glow_canvas));
+                graphics::clear(ctx, [0.0, 0.0, 0.0, 0.0].into());
+                cur_tank.draw(ctx, world)?;
+                graphics::set_canvas(ctx, None);
+                {
+                    let _lock = graphics::use_shader(ctx, &world.glow_shader);
+                    world.glow_shader.send(ctx, self.glow_params)?;
+                    graphics::draw(ctx, &self.glow_canvas, ([-1.0, -1.0],))?;
+                }
             }
 
             // Other tanks
@@ -102,15 +104,17 @@ impl scene::Scene<World, input::Event> for GamePlayScene {
                 graphics::draw(ctx, &world.missile_mesh, (missile.cur_pos(),))?;
             }
 
-            // Explosion
-            if let GameState::Exploding(ref explosion) = self.game_round.state {
-                let scale = explosion.cur_radius / 1000.0;
-                let alpha = (explosion.cur_opacity * 255.0) as u8;
-                let draw_params = graphics::DrawParam::new()
-                    .dest(explosion.pos)
-                    .scale([scale, scale])
-                    .color(graphics::Color::from_rgba(242, 68, 15, alpha));
-                graphics::draw(ctx, &world.explosion_mesh, draw_params)?;
+            // Explosions
+            if let Some(explosions) = self.game_round.explosions() {
+                for explosion in explosions {
+                    let scale = explosion.cur_radius / 1000.0;
+                    let alpha = (explosion.cur_opacity * 255.0) as u8;
+                    let draw_params = graphics::DrawParam::new()
+                        .dest(explosion.pos)
+                        .scale([scale, scale])
+                        .color(graphics::Color::from_rgba(242, 68, 15, alpha));
+                    graphics::draw(ctx, &world.explosion_mesh, draw_params)?;
+                }
             }
 
             graphics::pop_transform(ctx);

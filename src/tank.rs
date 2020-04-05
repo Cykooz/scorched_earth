@@ -70,6 +70,15 @@ impl Tank {
         [self.rect.x, self.rect.y].into()
     }
 
+    #[inline]
+    pub fn center(&self) -> Point2 {
+        [
+            self.rect.x + self.rect.w / 2.,
+            self.rect.y + self.rect.h / 2.,
+        ]
+        .into()
+    }
+
     pub fn gun_barrel_pos(&self) -> Point2 {
         let center = Point2::new(
             self.rect.x + self.rect.w / 2.,

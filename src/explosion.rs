@@ -31,21 +31,29 @@ impl Explosion {
         }
     }
 
-    pub fn update(&mut self, landscape: &mut Landscape) -> bool {
-        let time = self.created.elapsed().as_secs_f32();
-        let radius = time * SPEED;
-        self.cur_opacity = if radius <= self.max_radius {
-            1.0
-        } else {
-            0.0_f32.max((2.0 * self.max_radius - radius) / self.max_radius)
-        };
-        self.cur_radius = radius.min(self.max_radius);
+    #[inline]
+    pub fn is_life(self) -> bool {
+        self.cur_opacity > 0.0
+    }
 
-        if !self.landscape_updated && radius >= self.max_radius {
-            self.destroy_landscape(landscape);
+    /// Returns `true` if explosion has finished.
+    pub fn update(&mut self, landscape: &mut Landscape) -> bool {
+        if self.is_life() {
+            let time = self.created.elapsed().as_secs_f32();
+            let radius = time * SPEED;
+            self.cur_opacity = if radius <= self.max_radius {
+                1.0
+            } else {
+                0.0_f32.max((2.0 * self.max_radius - radius) / self.max_radius)
+            };
+            self.cur_radius = radius.min(self.max_radius);
+
+            if !self.landscape_updated && radius >= self.max_radius {
+                self.destroy_landscape(landscape);
+            }
         }
 
-        self.cur_opacity <= 0.0
+        !self.is_life()
     }
 
     fn destroy_landscape(&mut self, landscape: &mut Landscape) {

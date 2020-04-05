@@ -12,19 +12,14 @@ use crate::types::Vector2;
 use crate::world::World;
 use crate::G;
 
-#[derive(Debug, Clone, Copy)]
-pub enum ThrowingNumber {
-    First,
-    NotFirst,
-}
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum GameState {
-    TanksThrowing(ThrowingNumber),
+    TanksThrowing,
     Aiming,
     FlyingOfMissile(Missile),
-    Exploding(Explosion),
+    Exploding(Vec<Explosion>),
     Subsidence,
+    TanksExploding(Vec<Explosion>),
     Finish,
 }
 
@@ -37,6 +32,7 @@ pub struct Round {
     pub tanks: Vec<Tank>,
     pub current_tank: usize,
     pub state: GameState,
+    pub number_of_iteration: usize,
 }
 
 impl Round {
@@ -69,7 +65,8 @@ impl Round {
             wind_power: 0.0,
             tanks,
             current_tank: 0,
-            state: GameState::TanksThrowing(ThrowingNumber::First),
+            state: GameState::TanksThrowing,
+            number_of_iteration: 0,
         };
         round.change_wind();
         Ok(round)
@@ -91,24 +88,120 @@ impl Round {
     //        self.state = GameState::TanksThrowing;
     //    }
 
+    pub fn update(&mut self, world: &mut World) -> &GameState {
+        self.update_tanks(world);
+        self.update_missile(world);
+        self.update_explosions();
+        self.update_landscape();
+        &self.state
+    }
+
+    fn update_tanks(&mut self, world: &mut World) {
+        if let GameState::TanksThrowing = self.state {
+            let mut all_placed = true;
+            let live_tanks = self.tanks.iter_mut().filter(|t| !t.dead);
+            for tank in live_tanks {
+                all_placed &= tank.update(&mut self.landscape).is_placed();
+            }
+
+            if all_placed {
+                let explosions = self.remove_destroyed_tanks(world);
+
+                self.state = if !explosions.is_empty() {
+                    world.explosion_sound.play().unwrap();
+                    GameState::TanksExploding(explosions)
+                } else if self.live_tanks_count() <= 1 {
+                    GameState::Finish
+                } else {
+                    if self.number_of_iteration > 0 {
+                        self.switch_current_tank();
+                    }
+                    // self.change_wind();
+                    self.number_of_iteration = self.number_of_iteration.saturating_add(1);
+                    GameState::Aiming
+                };
+            }
+        }
+    }
+
+    fn update_missile(&mut self, world: &mut World) {
+        if let GameState::FlyingOfMissile(ref mut missile) = self.state {
+            if let Some(pos) = missile.update(&self.landscape) {
+                world.explosion_sound.play().unwrap();
+                self.state = GameState::Exploding(vec![Explosion::new(pos, 50.0)]);
+            }
+        }
+    }
+
+    fn update_explosions(&mut self) {
+        let explosions = match self.state {
+            GameState::Exploding(ref mut explosions) => Some(explosions),
+            GameState::TanksExploding(ref mut explosions) => Some(explosions),
+            _ => None,
+        };
+
+        if let Some(explosions) = explosions {
+            let landscape = &mut self.landscape;
+            let count_not_finished_explosions = explosions
+                .iter_mut()
+                .filter_map(|e| {
+                    if e.update(landscape) {
+                        return None;
+                    };
+                    Some(())
+                })
+                .count();
+
+            if count_not_finished_explosions == 0 {
+                // Check intersection of explosion with tanks and decrease its health.
+                let live_tanks = self.tanks.iter_mut().filter(|t| !t.dead);
+                for tank in live_tanks {
+                    for e in explosions.iter() {
+                        let percents = e.get_intersection_percents(tank.rect);
+                        tank.health = tank.health.saturating_sub(percents);
+                    }
+                }
+                self.landscape.subsidence();
+                self.state = GameState::Subsidence;
+            }
+        }
+    }
+
+    fn update_landscape(&mut self) {
+        if let GameState::Subsidence = self.state {
+            if self.landscape.update() {
+                let live_tanks = self.tanks.iter_mut().filter(|t| !t.dead);
+                for tank in live_tanks {
+                    tank.throw_down(None);
+                }
+                self.state = GameState::TanksThrowing;
+            }
+        }
+    }
+
     fn change_wind(&mut self) {
         self.wind_power = (self.rng.gen_range(-10.0_f32, 10.0_f32) * 10.0).round() / 10.0;
     }
 
-    /// Mark all destroyed tanks as "dead" and add some money to current player.
-    fn remove_destroyed_tanks(&mut self, world: &mut World) {
-        let current_player_number = self.player_number();
-        let mut count_of_destroyed: u32 = 0;
-        self.tanks
+    /// Mark all destroyed tanks as "dead", add some money to current player
+    /// and returns vector of tanks explosions.
+    fn remove_destroyed_tanks(&mut self, world: &mut World) -> Vec<Explosion> {
+        let explosions: Vec<Explosion> = self
+            .tanks
             .iter_mut()
             .filter(|t| t.health == 0 && !t.dead)
-            .for_each(|t| {
+            .map(|t| {
                 t.dead = true;
-                count_of_destroyed += 1;
-            });
+                Explosion::new(t.center(), 50.0)
+            })
+            .collect();
 
-        let player = &mut world.players[current_player_number as usize - 1];
+        let current_player_number = self.player_number() as usize;
+        let player = &mut world.players[current_player_number - 1];
+        let count_of_destroyed = explosions.len() as u32;
         player.money = player.money.saturating_add(200 * count_of_destroyed);
+
+        explosions
     }
 
     fn switch_current_tank(&mut self) {
@@ -135,73 +228,14 @@ impl Round {
         self.live_tanks().count()
     }
 
-    pub fn update(&mut self, world: &mut World) -> GameState {
-        self.update_tanks(world);
-        self.update_missile(world);
-        self.update_explosion();
-        self.update_landscape();
-        self.state
-    }
-
-    fn update_tanks(&mut self, world: &mut World) {
-        if let GameState::TanksThrowing(number) = self.state {
-            let mut all_placed = true;
-            let live_tanks = self.tanks.iter_mut().filter(|t| !t.dead);
-            for tank in live_tanks {
-                all_placed &= tank.update(&mut self.landscape).is_placed();
-            }
-
-            if all_placed {
-                if let ThrowingNumber::NotFirst = number {
-                    self.remove_destroyed_tanks(world);
-                    self.switch_current_tank();
-                }
-
-                self.state = if self.live_tanks_count() > 1 {
-                    GameState::Aiming
-                } else {
-                    GameState::Finish
-                };
-            }
-        }
-    }
-
-    fn update_missile(&mut self, world: &mut World) {
-        if let GameState::FlyingOfMissile(ref mut missile) = self.state {
-            if let Some(pos) = missile.update(&self.landscape) {
-                world.explosion_sound.play().unwrap();
-                self.state = GameState::Exploding(Explosion::new(pos, 50.0));
-            }
-        }
-    }
-
-    fn update_explosion(&mut self) {
-        if let GameState::Exploding(ref mut explosion) = self.state {
-            if explosion.update(&mut self.landscape) {
-                // Check intersection of explosion with tanks and decrease its health.
-                let live_tanks = self.tanks.iter_mut().filter(|t| !t.dead);
-                for tank in live_tanks {
-                    let percents = explosion.get_intersection_percents(tank.rect);
-                    tank.health = tank.health.saturating_sub(percents);
-                }
-
-                self.landscape.subsidence();
-                self.state = GameState::Subsidence;
-            }
-        }
-    }
-
-    fn update_landscape(&mut self) {
-        if let GameState::Subsidence = self.state {
-            if self.landscape.update() {
-                let live_tanks = self.tanks.iter_mut().filter(|t| !t.dead);
-                for tank in live_tanks {
-                    tank.throw_down(None);
-                }
-                self.change_wind();
-                self.state = GameState::TanksThrowing(ThrowingNumber::NotFirst);
-            }
-        }
+    #[inline]
+    pub fn explosions(&self) -> Option<impl Iterator<Item = &Explosion>> {
+        let explosions = match self.state {
+            GameState::Exploding(ref explosions) => Some(explosions),
+            GameState::TanksExploding(ref explosions) => Some(explosions),
+            _ => None,
+        };
+        explosions.map(|e| e.iter().filter(|e| e.is_life()))
     }
 
     /// Increment angle of gun of current tank
