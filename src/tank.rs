@@ -14,7 +14,13 @@ const GUN_SIZE: f32 = 21.;
 const POWER_SCALE: f32 = 300. / 100.;
 const TIME_SCALE: f32 = 3.0;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
+struct TankThrowing {
+    start_height: f32,
+    ballistics: Ballistics,
+}
+
+#[derive(Debug, Clone)]
 pub struct Tank {
     pub player_number: u8,
     pub rect: graphics::Rect,
@@ -23,21 +29,21 @@ pub struct Tank {
     pub power: f32,
     pub health: u8,
     pub dead: bool,
-    throwing: Option<Ballistics>,
+    throwing: Option<TankThrowing>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub enum TankState {
-    Placed,
+    Placed(f32),
     Dropped,
 }
 
-impl TankState {
-    #[inline]
-    pub fn is_placed(self) -> bool {
-        self == TankState::Placed
-    }
-}
+// impl TankState {
+//     #[inline]
+//     pub fn is_placed(self) -> bool {
+//         self == TankState::Placed
+//     }
+// }
 
 impl Tank {
     pub fn new<P>(player_number: u8, top_left: P, color: graphics::Color) -> Tank
@@ -99,13 +105,16 @@ impl Tank {
     }
 
     pub fn update(&mut self, landscape: &mut Landscape) -> TankState {
-        if let Some(ballistics) = self.throwing.as_mut() {
+        let mut start_height = self.rect.bottom() - 1.;
+
+        if let Some(throwing) = self.throwing.as_mut() {
+            start_height = throwing.start_height;
             let height = landscape.size().1 as i32;
             let tank_width = self.rect.w;
             let max_empty_count = (0.3 * tank_width).round() as usize;
             let mut offset: f32 = 0.0;
 
-            for (x, y) in ballistics.positions_iter(None, None) {
+            for (x, y) in throwing.ballistics.positions_iter(None, None) {
                 if y >= height {
                     self.throwing = None;
                     break;
@@ -135,7 +144,9 @@ impl Tank {
         }
 
         if self.throwing.is_none() {
-            TankState::Placed
+            let cur_height = self.rect.bottom() - 1.;
+            let path_len = cur_height - start_height;
+            TankState::Placed(path_len)
         } else {
             TankState::Dropped
         }
@@ -146,10 +157,12 @@ impl Tank {
             self.rect.y = top;
         }
 
-        self.throwing = Some(
-            Ballistics::new([self.rect.x, self.rect.bottom() - 1.], [0., 0.], [0., G])
+        let start_height = self.rect.bottom() - 1.;
+        self.throwing = Some(TankThrowing {
+            start_height,
+            ballistics: Ballistics::new([self.rect.x, start_height], [0., 0.], [0., G])
                 .time_scale(TIME_SCALE),
-        );
+        });
     }
 
     pub fn draw(&self, ctx: &mut ggez::Context, world: &World) -> GameResult {
@@ -162,6 +175,11 @@ impl Tank {
         let tank_params = graphics::DrawParam::new().dest(pos);
         graphics::draw(ctx, &world.tank_image, tank_params)?;
         Ok(())
+    }
+
+    #[inline]
+    pub fn damage(&mut self, v: u8) {
+        self.health = self.health.saturating_sub(v);
     }
 }
 

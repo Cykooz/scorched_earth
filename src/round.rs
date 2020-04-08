@@ -7,10 +7,13 @@ use rand::Rng;
 use crate::explosion::Explosion;
 use crate::landscape::Landscape;
 use crate::missile::Missile;
-use crate::tank::Tank;
+use crate::tank::{Tank, TankState};
 use crate::types::Vector2;
 use crate::world::World;
 use crate::G;
+
+/// A damage per one pixel of height with which tank was dropped.
+const TANK_THROWING_DAMAGE_POWER: f32 = 0.1;
 
 #[derive(Debug, Clone)]
 pub enum GameState {
@@ -19,7 +22,6 @@ pub enum GameState {
     FlyingOfMissile(Missile),
     Exploding(Vec<Explosion>),
     Subsidence,
-    TanksExploding(Vec<Explosion>),
     Finish,
 }
 
@@ -101,7 +103,16 @@ impl Round {
             let mut all_placed = true;
             let live_tanks = self.tanks.iter_mut().filter(|t| !t.dead);
             for tank in live_tanks {
-                all_placed &= tank.update(&mut self.landscape).is_placed();
+                let tank_state = tank.update(&mut self.landscape);
+                if let TankState::Placed(path_len) = tank_state {
+                    if self.number_of_iteration > 0 {
+                        let damage_value: u8 =
+                            (path_len * TANK_THROWING_DAMAGE_POWER).min(255.).round() as u8;
+                        tank.damage(damage_value);
+                    }
+                } else {
+                    all_placed = false;
+                }
             }
 
             if all_placed {
@@ -109,7 +120,7 @@ impl Round {
 
                 self.state = if !explosions.is_empty() {
                     world.explosion_sound.play().unwrap();
-                    GameState::TanksExploding(explosions)
+                    GameState::Exploding(explosions)
                 } else if self.live_tanks_count() <= 1 {
                     GameState::Finish
                 } else {
@@ -134,13 +145,7 @@ impl Round {
     }
 
     fn update_explosions(&mut self) {
-        let explosions = match self.state {
-            GameState::Exploding(ref mut explosions) => Some(explosions),
-            GameState::TanksExploding(ref mut explosions) => Some(explosions),
-            _ => None,
-        };
-
-        if let Some(explosions) = explosions {
+        if let GameState::Exploding(ref mut explosions) = self.state {
             let landscape = &mut self.landscape;
             let count_not_finished_explosions = explosions
                 .iter_mut()
@@ -158,7 +163,7 @@ impl Round {
                 for tank in live_tanks {
                     for e in explosions.iter() {
                         let percents = e.get_intersection_percents(tank.rect);
-                        tank.health = tank.health.saturating_sub(percents);
+                        tank.damage(percents);
                     }
                 }
                 self.landscape.subsidence();
@@ -230,24 +235,17 @@ impl Round {
 
     #[inline]
     pub fn explosions(&self) -> Option<impl Iterator<Item = &Explosion>> {
-        let explosions = match self.state {
-            GameState::Exploding(ref explosions) => Some(explosions),
-            GameState::TanksExploding(ref explosions) => Some(explosions),
+        match self.state {
+            GameState::Exploding(ref explosions) => Some(explosions.iter().filter(|e| e.is_life())),
             _ => None,
-        };
-        explosions.map(|e| e.iter().filter(|e| e.is_life()))
+        }
     }
 
     /// Increment angle of gun of current tank
     pub fn inc_gun_angle(&mut self, delta: f32) {
         if let Some(tank) = self.tanks.get_mut(self.current_tank) {
-            let mut angle = tank.angle + delta;
-            if angle > 90.0 {
-                angle = 90.0;
-            } else if angle < -90.0 {
-                angle = -90.0;
-            }
-            tank.angle = angle;
+            let angle = tank.angle + delta;
+            tank.angle = angle.min(90.).max(-90.);
         }
     }
 
@@ -291,13 +289,8 @@ impl Round {
     /// Increment power of gun of current tank
     pub fn inc_gun_power(&mut self, delta: f32) {
         if let Some(tank) = self.tanks.get_mut(self.current_tank) {
-            let mut power = tank.power + delta;
-            if power > 100.0 {
-                power = 100.0;
-            } else if power < 0.0 {
-                power = 0.0;
-            }
-            tank.power = power;
+            let power = tank.power + delta;
+            tank.power = power.min(100.).max(0.);
         }
     }
 
