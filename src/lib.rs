@@ -14,4 +14,4 @@ mod utils;
 pub mod world;
 
 pub const G: f32 = 9.80665;
-pub const MAX_PLAYERS_COUNT: u8 = 8;
+pub const MAX_PLAYERS_COUNT: u8 = 5;

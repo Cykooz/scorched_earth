@@ -17,6 +17,7 @@ pub struct World {
     pub missile_mesh: graphics::Mesh,
     pub explosion_mesh: graphics::Mesh,
     pub glow_shader: shaders::GlowShader,
+    pub hue_shader: shaders::HueShader,
     pub players: Vec<Player>,
 }
 
@@ -54,6 +55,7 @@ impl World {
                 graphics::WHITE,
             )?,
             glow_shader: shaders::load_glow_shader(ctx)?,
+            hue_shader: shaders::load_hue_shader(ctx)?,
             players: Vec::with_capacity(MAX_PLAYERS_COUNT as usize),
         };
         world.create_players_count(2);

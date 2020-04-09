@@ -1,5 +1,4 @@
 use ggez::audio::SoundSource;
-use ggez::graphics::Color;
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -10,7 +9,7 @@ use crate::missile::Missile;
 use crate::tank::{Tank, TankState};
 use crate::types::Vector2;
 use crate::world::World;
-use crate::G;
+use crate::{G, MAX_PLAYERS_COUNT};
 
 /// A damage per one pixel of height with which tank was dropped.
 const TANK_THROWING_DAMAGE_POWER: f32 = 0.1;
@@ -55,7 +54,8 @@ impl Round {
             .enumerate()
             .map(|(i, &player_number)| {
                 let x = 100. + size_between_tanks * i as f32;
-                Tank::new(player_number, [x, 50.], Color::from_rgb(245, 71, 32))
+                let hue_offset = (player_number as u16 - 1) * (360 / MAX_PLAYERS_COUNT as u16);
+                Tank::new(player_number, [x, 50.], hue_offset)
             })
             .collect();
 

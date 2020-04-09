@@ -5,6 +5,7 @@ use ggez::{self, graphics, GameResult};
 use crate::ballistics::Ballistics;
 use crate::landscape::Landscape;
 use crate::missile::Missile;
+use crate::shaders;
 use crate::types::{Point2, Vector2};
 use crate::world::World;
 use crate::G;
@@ -24,7 +25,7 @@ struct TankThrowing {
 pub struct Tank {
     pub player_number: u8,
     pub rect: graphics::Rect,
-    pub color: graphics::Color,
+    hue_offset: shaders::HueOffset,
     pub angle: f32,
     pub power: f32,
     pub health: u8,
@@ -46,16 +47,17 @@ pub enum TankState {
 // }
 
 impl Tank {
-    pub fn new<P>(player_number: u8, top_left: P, color: graphics::Color) -> Tank
+    pub fn new<P, H>(player_number: u8, top_left: P, hue_offset: H) -> Tank
     where
         P: Into<Point2>,
+        H: Into<f32>,
     {
         let top_left: Point2 = top_left.into();
         let rect = graphics::Rect::new(top_left.x, top_left.y, TANK_SIZE, TANK_SIZE);
         let mut tank = Tank {
             player_number,
             rect,
-            color,
+            hue_offset: shaders::HueOffset::new(hue_offset),
             angle: 0.0,
             power: 40.0,
             health: 100,
@@ -166,6 +168,9 @@ impl Tank {
     }
 
     pub fn draw(&self, ctx: &mut ggez::Context, world: &World) -> GameResult {
+        let _lock = graphics::use_shader(ctx, &world.hue_shader);
+        world.hue_shader.send(ctx, self.hue_offset.into())?;
+
         let pos = self.top_left();
         let gun_params = graphics::DrawParam::new()
             .dest(pos + Vector2::new(20.5, 20.5))
@@ -180,16 +185,5 @@ impl Tank {
     #[inline]
     pub fn damage(&mut self, v: u8) {
         self.health = self.health.saturating_sub(v);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_bottom_left() {
-        let tank = Tank::new(1, [0., 0.], (0, 0, 0).into());
-        assert_eq!(tank.bottom_left(), [0., TANK_SIZE - 1.].into());
     }
 }
