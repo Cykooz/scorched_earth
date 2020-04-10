@@ -137,7 +137,18 @@ impl Round {
 
     fn update_missile(&mut self, world: &mut World) {
         if let GameState::FlyingOfMissile(ref mut missile) = self.state {
-            if let Some(pos) = missile.update(&self.landscape) {
+            let landscape = &self.landscape;
+            let tanks = &self.tanks;
+            let size = landscape.size();
+            let borders = (size.0 as i32, size.1 as i32);
+            let hit_point = missile.update(borders, |x, y| {
+                landscape.is_not_empty(x, y)
+                    || tanks
+                        .iter()
+                        .filter(|t| !t.dead)
+                        .any(|t| t.has_collision((x as f32, y as f32)))
+            });
+            if let Some(pos) = hit_point {
                 world.explosion_sound.play().unwrap();
                 self.state = GameState::Exploding(vec![Explosion::new(pos, 50.0)]);
             }

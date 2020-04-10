@@ -26,17 +26,12 @@ impl Missile {
         self.ballistics.cur_pos()
     }
 
-    //    #[inline]
-    //    pub fn cur_velocity(&self) -> Vector2 {
-    //        self.ballistics.pos_and_velocity().1
-    //    }
-
-    pub fn update(&mut self, landscape: &Landscape) -> Option<Point2> {
-        let size = landscape.size();
-        let borders = (size.0 as i32, size.1 as i32);
-
+    pub fn update<F>(&mut self, borders: (i32, i32), has_collision: F) -> Option<Point2>
+    where
+        F: Fn(i32, i32) -> bool,
+    {
         for (x, y) in self.ballistics.positions_iter(None, Some(borders)) {
-            if landscape.is_not_empty(x, y) || y >= borders.1 {
+            if has_collision(x, y) || y >= borders.1 {
                 return Some(Point2::new(x as f32, y as f32));
             }
         }

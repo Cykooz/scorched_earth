@@ -1,8 +1,10 @@
 use std::f32::consts::PI;
 
+use cgmath::{Basis2, Deg, Rotation, Rotation2};
 use ggez::{self, graphics, GameResult};
 
 use crate::ballistics::Ballistics;
+use crate::geometry::Ellipse;
 use crate::landscape::Landscape;
 use crate::missile::Missile;
 use crate::shaders;
@@ -25,6 +27,8 @@ struct TankThrowing {
 pub struct Tank {
     pub player_number: u8,
     pub rect: graphics::Rect,
+    body_bounds: Vec<Ellipse>,
+    gun_bounds: Vec<Ellipse>,
     hue_offset: shaders::HueOffset,
     pub angle: f32,
     pub power: f32,
@@ -54,9 +58,21 @@ impl Tank {
     {
         let top_left: Point2 = top_left.into();
         let rect = graphics::Rect::new(top_left.x, top_left.y, TANK_SIZE, TANK_SIZE);
+        let body_bounds = vec![
+            Ellipse::new((20.5, 26.), 9.5, 9.),    // top bound
+            Ellipse::new((11., 33.5), 10., 6.5),   // left bound
+            Ellipse::new((30., 33.5), 10., 6.5),   // right bound
+            Ellipse::new((20.5, 33.5), 19.5, 7.5), // center bound
+        ];
+        let gun_bounds = vec![
+            Ellipse::new((20.5, 6.5), 2.5, 5.),
+            Ellipse::new((20.5, 15.5), 2., 8.),
+        ];
         let mut tank = Tank {
             player_number,
             rect,
+            body_bounds,
+            gun_bounds,
             hue_offset: shaders::HueOffset::new(hue_offset),
             angle: 0.0,
             power: 40.0,
@@ -80,21 +96,16 @@ impl Tank {
 
     #[inline]
     pub fn center(&self) -> Point2 {
-        [
+        Point2::new(
             self.rect.x + self.rect.w / 2.,
             self.rect.y + self.rect.h / 2.,
-        ]
-        .into()
+        )
     }
 
     pub fn gun_barrel_pos(&self) -> Point2 {
-        let center = Point2::new(
-            self.rect.x + self.rect.w / 2.,
-            self.rect.y + self.rect.h / 2.,
-        );
         let rad = self.angle * PI / 180.0;
         let gun_vec = Vector2::new(GUN_SIZE * rad.sin(), -GUN_SIZE * rad.cos());
-        center + gun_vec
+        self.center() + gun_vec
     }
 
     pub fn shoot(&self, acceleration: Vector2) -> Missile {
@@ -185,5 +196,75 @@ impl Tank {
     #[inline]
     pub fn damage(&mut self, v: u8) {
         self.health = self.health.saturating_sub(v);
+    }
+
+    /// Returns `true` if given point locates inside of tank's body or gun.
+    pub fn has_collision<P: Into<Point2>>(&self, point: P) -> bool {
+        let local_point = point.into() - Vector2::new(self.rect.x, self.rect.y);
+        if self
+            .body_bounds
+            .iter()
+            .any(|b| b.point_position(local_point) <= 0.)
+        {
+            return true;
+        }
+
+        let tank_center = Vector2::new(TANK_SIZE / 2., TANK_SIZE / 2.);
+        let rotation: Basis2<_> = Rotation2::from_angle(Deg(-self.angle));
+        let rotated_point = rotation.rotate_point(local_point - tank_center) + tank_center;
+        self.gun_bounds
+            .iter()
+            .any(|b| b.point_position(rotated_point) <= 0.)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_has_collision() {
+        let mut tank = Tank::new(1, (10.0, 20.0), 0.);
+
+        let inner_points = [
+            (20., 27.), // body center
+            (4., 32.),  // body left
+            (37., 32.), // body right
+            (20., 40.), // body bottom
+            (20., 18.), // body top
+            (20., 2.),  // gun top
+            (20., 13.), // gun middle
+        ];
+        for point in inner_points.iter() {
+            assert!(
+                tank.has_collision((10. + point.0, 20. + point.1)),
+                format!("point=({}, {})", point.0, point.1)
+            );
+        }
+
+        // Rotated gun
+        tank.angle = 60.;
+        let inner_points = [
+            (34., 11.), // gun top
+            (24., 18.), // gun middle
+        ];
+        for point in inner_points.iter() {
+            assert!(
+                tank.has_collision((10. + point.0, 20. + point.1)),
+                format!("point=({}, {})", point.0, point.1)
+            );
+        }
+
+        tank.angle = -45.;
+        let inner_points = [
+            (8., 8.),   // gun top
+            (15., 15.), // gun middle
+        ];
+        for point in inner_points.iter() {
+            assert!(
+                tank.has_collision((10. + point.0, 20. + point.1)),
+                format!("point=({}, {})", point.0, point.1)
+            );
+        }
     }
 }

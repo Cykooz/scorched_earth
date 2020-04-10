@@ -1,15 +1,15 @@
 use ggez_goodies::scene;
 
+pub use game_play::GamePlayScene;
+pub use main_menu::MainMenuScene;
+pub use select_count_of_players::SelectCountOfPlayersScene;
+
 use crate::input;
 use crate::world::World;
 
 pub mod game_play;
 pub mod main_menu;
 pub mod select_count_of_players;
-
-pub use game_play::GamePlayScene;
-pub use main_menu::MainMenuScene;
-pub use select_count_of_players::SelectCountOfPlayersScene;
 
 // Shortcuts for our scene type.
 pub type Switch = scene::SceneSwitch<World, input::Event>;
