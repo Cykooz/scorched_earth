@@ -198,9 +198,23 @@ impl Tank {
         self.health = self.health.saturating_sub(v);
     }
 
+    #[inline]
+    pub fn body_rect(&self) -> graphics::Rect {
+        graphics::Rect {
+            x: self.rect.x,
+            y: self.rect.y + 20.,
+            w: self.rect.w,
+            h: self.rect.h - 20.,
+        }
+    }
+
     /// Returns `true` if given point locates inside of tank's body or gun.
     pub fn has_collision<P: Into<Point2>>(&self, point: P) -> bool {
-        let local_point = point.into() - Vector2::new(self.rect.x, self.rect.y);
+        let point = point.into();
+        if !self.rect.contains(point) {
+            return false;
+        }
+        let local_point = point - Vector2::new(self.rect.x, self.rect.y);
         if self
             .body_bounds
             .iter()

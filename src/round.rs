@@ -173,7 +173,7 @@ impl Round {
                 let live_tanks = self.tanks.iter_mut().filter(|t| !t.dead);
                 for tank in live_tanks {
                     for e in explosions.iter() {
-                        let percents = e.get_intersection_percents(tank.rect);
+                        let percents = e.get_intersection_percents(tank.body_rect());
                         tank.damage(percents);
                     }
                 }
